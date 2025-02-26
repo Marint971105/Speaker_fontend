@@ -1,0 +1,30 @@
+// 全局样式变量
+$border-color: #dcdfe6;
+$primary-color: #409EFF;
+
+// 布局相关
+.editor-container {
+  .editor-section {
+    background: #fff;
+  }
+
+  .ai-section {
+    background: #f5f7fa;
+  }
+}
+
+// 工具栏样式
+.toolbar {
+  padding: 10px;
+  border-bottom: 1px solid $border-color;
+}
+
+// 文档区域样式
+.document-area {
+  padding: 20px;
+
+  .el-textarea__inner {
+    border: none;
+    height: 100%;
+  }
+}
