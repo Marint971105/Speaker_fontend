@@ -2,7 +2,7 @@
   <div class="login">
     <div class="overlay"></div> <!-- 添加这一行 -->
     <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
-<!--      <h3 class="title">言之“邮”理</h3>-->
+<!--      <h3 class="title">言之"邮"理</h3>-->
 <!--      <h3 class="title">研究生演讲能力智能评价系统</h3>-->
       <img src="@/assets/logo/logo4.png" alt="Utalk Logo" class="logo-img">
       <el-form-item prop="username">
@@ -54,6 +54,16 @@
         >
           <span v-if="!loading">登 录</span>
           <span v-else>登 录 中...</span>
+        </el-button>
+        <!-- 添加统一认证按钮 -->
+        <el-button
+          size="medium"
+          type="primary"
+          style="width:100%; margin-top: 15px;"
+          @click="handleCasLogin"
+          class="login-button cas-button"
+        >
+          统一认证登录
         </el-button>
         <div style="float: right;" v-if="register">
           <router-link class="link-type" :to="'/register'">立即注册</router-link>
@@ -160,6 +170,27 @@ export default {
           });
         }
       });
+    },
+    // 添加统一认证登录方法
+    handleCasLogin() {
+      const casLoginUrl = process.env.VUE_APP_CAS_LOGIN_URL
+      
+      // 按照 RFC2396 标准编码保留字符
+      function rfc2396Encode(str) {
+        // 编码所有保留字符: ;/?:@&=+$,
+        return str.replace(/[;/?:@&=+$,]/g, function(char) {
+          // 转换为16进制，确保两位数，小写
+          const hex = char.charCodeAt(0).toString(16).toLowerCase();
+          return '%' + (hex.length === 1 ? '0' + hex : hex);
+        });
+      }
+      
+      // 使用与后端完全相同的 service URL
+      const serviceUrl = rfc2396Encode('http://123.56.183.160:8081/cas/callback')
+      
+      console.log('编码前service:', 'http://123.56.183.160:8081/cas/callback')
+      console.log('编码后service:', serviceUrl)
+      window.location.href = `${casLoginUrl}?service=${serviceUrl}`
     }
   }
 };
@@ -308,5 +339,14 @@ export default {
   width: 100%;  /* 可以根据需要调整宽度 */
   margin: 0 auto 2rem;  /* 上0 左右auto居中 下40px */
   display: block;  /* 块级元素以便使用margin auto居中 */
+}
+
+.cas-button {
+  background: linear-gradient(135deg, #0072BD, #8BB174) !important;  // 可以稍微改变渐变方向区分两个按钮
+  
+  &:hover {
+    background: linear-gradient(135deg, #8BB174, #0072BD) !important;
+    transform: scale(1.05);
+  }
 }
 </style>

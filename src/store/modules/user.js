@@ -2,6 +2,8 @@
 import { login, getInfo } from '@/api/login'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import Vue from "vue";
+import request from '@/utils/request'
+
 const user = {
   state: {
     token: getToken(),
@@ -112,7 +114,26 @@ const user = {
         })
       })
     },
-
+    //CAS登录
+    CasLogin({ commit }, { ticket }) {
+      return new Promise((resolve, reject) => {
+        request({
+          url: `/login?ticket=${ticket}`,
+          method: 'post'
+        }).then(response => {
+          if (response.code === 1) {  // 注意这里是 code === 1
+            const token = response.data  // 直接使用返回的 token
+            setToken(token)
+            commit('SET_TOKEN', token)
+            resolve()
+          } else {
+            reject(response.msg)
+          }
+        }).catch(error => {
+          reject(error)
+        })
+      })
+    },
     // 退出系统
     // LogOut({ commit, state }) {
     //   return new Promise((resolve, reject) => {

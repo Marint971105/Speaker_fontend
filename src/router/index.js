@@ -87,6 +87,11 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/cas/callback',
+    component: () => import('@/views/cas/callback'),
+    hidden: true
   }
 ]
 
@@ -423,7 +428,6 @@ export const dynamicRoutes = [
       }
     ]
   },
-
 
   {
     path: '/tool/gen-edit',
