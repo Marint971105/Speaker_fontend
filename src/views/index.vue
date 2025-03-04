@@ -19,7 +19,9 @@
           <div v-for="feature in features"
                :key="feature.id"
                class="feature-wrapper">
-            <div class="feature-card">
+            <div class="feature-card" 
+                 @click="handleFeatureClick(feature.id)"
+                 :class="{ clickable: feature.id === 1 || feature.id === 2 }">
               <h3>{{ feature.title }}</h3>
               <p>{{ feature.description }}</p>
             </div>
@@ -56,32 +58,32 @@ export default {
       features: [
         {
           id: 1,
-          title: "演讲视频自动评价",
-          description: "依托视频理解、语音识别、情感分析等大语言模型，为演讲教学与评价提供支持",
+          title: "演讲稿智能写作与评价",
+          description: "依托先进的大语言模型技术，为演讲稿写作提供翻译、续写、润色等支持",
           icon: require('@/assets/selfpractice.png'),
           iconTextEn: "Self Practice",
           iconTextCn: "自我训练"
         },
         {
           id: 2,
-          title: "生成式AI智能分析",
-          description: "全面分析视频、音频、PPT、演讲稿，提供专业评估报告",
+          title: "演讲视频智能评价",
+          description: "全面评估演讲视频中演讲者的姿态、语调和情感表现，并提供针对性优化建议",
           icon: require('@/assets/客户档案.png'),
           iconTextEn: "Anxiety Detection",
           iconTextCn: "焦虑检测"
         },
         {
           id: 3,
-          title: "数据可视化",
-          description: "直观展示评估结果，帮助快速定位改进方向",
+          title: "公众演讲多模态智能评价",
+          description: "融合视频、音频、演讲稿、PPT等多维数据，提供全方位演讲能力测评报告",
           icon: require('@/assets/绩效设置汇总.png'),
           iconTextEn: "Visual Analysis",
           iconTextCn: "可视化分析"
         },
         {
           id: 4,
-          title: "个性化学习",
-          description: "基于历史数据，为每位学生提供定制化的提升建议",
+          title: "英语语音智能评价",
+          description: "基于语音识别与分析技术，精准评估发音、语调及流利度，助力提升口语表达能力",
           icon: require('@/assets/菜单设置.png'),
           iconTextEn: "Multidimensional Ability",
           iconTextCn: "多维测试"
@@ -114,6 +116,99 @@ export default {
           label: "高校高中共建共享"
         },
       ]
+    }
+  },
+  methods: {
+    handleFeatureClick(featureId) {
+      if (featureId === 1) {
+        // 跳转到演讲稿写作页面
+        this.$router.push('/chat/index');
+      } else if (featureId === 2) {
+        // 跳转到视频分析页面
+        this.$router.push('/homeworkTrial/video/index');
+      }
+    },
+    async processVideo() {
+      if (!this.videoRunning) return;
+      
+      const video = this.$refs.inputVideo;
+      
+      try {
+        // 检查视频是否已加载并准备好帧
+        if (video.readyState >= 2) {
+          // MediaPipe只处理当前视频帧，不关心它来自哪里
+          await this.holistic.send({image: video});
+          
+          // 在HTTP环境中，一定要捕获所有可能的错误以防止中断
+          if (this.videoRunning) {
+            requestAnimationFrame(this.processVideo);
+          }
+        } else {
+          // 视频尚未准备好，稍后再试
+          setTimeout(() => this.processVideo(), 100);
+        }
+      } catch (err) {
+        console.error('处理视频帧时出错:', err);
+        if (this.videoRunning) {
+          // 错误时继续尝试处理下一帧
+          requestAnimationFrame(this.processVideo);
+        }
+      }
+    },
+    async initializeHolistic() {
+      try {
+        // 添加额外的错误处理和重试逻辑
+        const loadWasmWithRetry = async (path, retries = 3) => {
+          for (let i = 0; i < retries; i++) {
+            try {
+              const response = await fetch(path);
+              if (response.ok) return response;
+              console.warn(`加载WASM文件失败，正在重试(${i+1}/${retries})...`);
+            } catch (err) {
+              console.error(`WASM加载失败:`, err);
+            }
+            // 等待短暂时间后重试
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          throw new Error(`无法加载WASM文件: ${path}`);
+        };
+
+        // 在初始化前预加载关键文件
+        await loadWasmWithRetry(`${process.env.BASE_URL}mediapipe/holistic_solution_simd_wasm_bin.wasm`);
+
+        // 降低模型复杂度，以减少资源消耗
+        this.holistic = new Holistic({
+          locateFile: (file) => {
+            return `${process.env.BASE_URL}mediapipe/${file}`;
+          }
+        });
+
+        await this.holistic.setOptions({
+          modelComplexity: 0,  // 降至最低复杂度
+          smoothLandmarks: true,
+          enableSegmentation: false,  // 禁用不必要功能
+          refineFaceLandmarks: false, // 禁用不必要功能
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+        
+        // 剩余初始化代码...
+      } catch (err) {
+        console.error('初始化 MediaPipe 失败:', err);
+        this.error = '初始化失败，请尝试使用较小的视频文件';
+      }
+    },
+    handleVideoUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      // 添加文件大小检查
+      if (file.size > 100 * 1024 * 1024) { // 例如限制100MB
+        this.error = '视频文件过大，请上传小于100MB的视频';
+        return;
+      }
+      
+      // 继续处理上传...
     }
   }
 }
@@ -238,6 +333,17 @@ export default {
     line-height: 1.5;
     text-align: justify;
     width: 100%;
+  }
+  
+  &.clickable {
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      background: rgba(255, 255, 255, 0.1);
+    }
   }
 }
 

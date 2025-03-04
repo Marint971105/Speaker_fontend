@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "set NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service serve",
     "build": "set NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service build",
-    "build:prod": "set NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service build --mode production",
+    "build:prod:win": "set NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service build --mode production",
+    "build:prod:unix": "export NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service build --mode production",
+    "build:prod": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build --mode production",
     "build:stage": "vue-cli-service build --mode staging",
     "preview": "node build/index.js --preview",
     "lint": "eslint --ext .js,.vue src"
@@ -37,6 +39,11 @@
     "url": "https://gitee.com/y_project/RuoYi-Vue.git"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@mediapipe/drawing_utils": "^0.3.1675466124",
+    "@mediapipe/holistic": "^0.5.1675471629",
+    "@mediapipe/tasks-vision": "^0.10.21",
     "@riophae/vue-treeselect": "0.4.0",
     "autofit.js": "^3.2.2",
     "axios": "0.28.1",
@@ -89,6 +96,7 @@
     "chalk": "4.1.0",
     "compression-webpack-plugin": "6.1.2",
     "connect": "3.6.6",
+    "cross-env": "^7.0.3",
     "eslint": "7.15.0",
     "eslint-plugin-vue": "7.2.0",
     "lint-staged": "10.5.3",

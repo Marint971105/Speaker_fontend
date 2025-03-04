@@ -50,6 +50,8 @@ module.exports = {
     disableHostCheck: false,
     headers: {
       'Access-Control-Allow-Origin': '*',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin'
     }
   },
   css: {
@@ -87,6 +89,18 @@ module.exports = {
     entry: {
       app: './src/main.js'  // 明确指定入口文件位置
     },
+    module: {
+      rules: [
+        {
+          test: /\.wasm$/,
+          type: 'javascript/auto',
+          loader: 'file-loader',
+          options: {
+            name: 'mediapipe/[name].[hash:8].[ext]'
+          }
+        }
+      ]
+    }
   },
   chainWebpack(config) {
     config.plugins.delete('preload') // TODO: need test
@@ -144,5 +158,15 @@ module.exports = {
       })
       config.optimization.runtimeChunk('single')
     })
+
+    config.plugin('copy')
+      .tap(args => {
+        args[0].push({
+          from: 'public/mediapipe',
+          to: 'mediapipe',
+          toType: 'dir'
+        })
+        return args
+      })
   }
 }
