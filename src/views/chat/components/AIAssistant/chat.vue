@@ -22,10 +22,26 @@
           </div>
         </div>
         <!-- 加载动画 -->
-        <div v-if="isLoading" class="message-item assistant">
-          <el-avatar :size="40" icon="el-icon-service" class="assistant-avatar"></el-avatar>
+        <div v-if="isLoading" class="message assistant">
           <div class="message-content">
-            <div class="message-bubble">
+            <div class="message-avatar">
+              <el-avatar :size="36" icon="el-icon-service" />
+            </div>
+            <div class="message-bubble thinking-bubble">
+              <div class="thinking-header">
+                <i class="el-icon-loading thinking-icon"></i>
+                <div class="thinking-text">AI助手思考中</div>
+              </div>
+              <div class="thinking-detail">大语言模型正在深度思考并生成回复，这可能需要一些时间...</div>
+              <div class="thinking-animation">
+                <div class="brain-animation">
+                  <div class="brain-container">
+                    <div class="brain-wave"></div>
+                    <div class="brain-wave"></div>
+                    <div class="brain-wave"></div>
+                  </div>
+                </div>
+              </div>
               <div class="typing-indicator">
                 <span></span>
                 <span></span>
@@ -42,7 +58,7 @@
           v-model="userInput"
           type="textarea"
           :rows="3"
-          placeholder="输入消息..."
+          placeholder="请在这里输入您的要求..."
           @keydown.enter.native.prevent="handleEnter"
         />
         <div class="input-actions">
@@ -98,6 +114,7 @@ export default {
     window.addEventListener('beforeunload', this.handleBeforeUnload)
     this.$bus.$on('FedLogOut', this.clearChatHistory)
     this.$bus.$on('sendToAI', this.handleIncomingMessage)
+    this.$bus.$on('insertToChat', this.insertToInput)
   },
   destroyed() {
     // 移除事件监听
@@ -107,6 +124,7 @@ export default {
     // 确保清除历史
     this.clearChatHistory()
     this.$bus.$off('sendToAI', this.handleIncomingMessage)
+    this.$bus.$off('insertToChat', this.insertToInput)
   },
   watch: {
     messages: {
@@ -211,12 +229,19 @@ export default {
           })
         }
 
+        // 确保加载状态设置为true，显示思考动画
+        this.isLoading = true
+        this.scrollToBottom() // 滚动到底部，确保用户能看到加载动画
+        
+        console.log('发送消息中，显示思考动画...')
+        
         const response = await sendChatMessage({
           message: messageContent,
           conversation_messages: messagesForApi
         })
 
         if (response.status === 'success') {
+          console.log('接收到回复，隐藏思考动画')
           response.data.id = this.getNextSequence()
           this.messages.push(response.data)
         } else {
@@ -284,6 +309,18 @@ export default {
       this.isSystemPrompt = true // 标记为系统prompt
       this.userInput = message
       this.sendMessage()
+    },
+    insertToInput(text) {
+      // 将选中的文本插入到输入框
+      this.userInput = text || '';
+      // 聚焦输入框
+      this.$nextTick(() => {
+        const textarea = document.querySelector('.chat-input .el-textarea__inner');
+        if (textarea) {
+          textarea.focus();
+          textarea.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
     },
     handleSend() {
       // 防止空消息
@@ -494,6 +531,222 @@ export default {
   .chat-container {
     height: 90vh; /* 在小屏上增大比例 */
     min-height: 300px;
+  }
+}
+
+/* 思考中气泡样式 */
+.thinking-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 200px;
+  background: linear-gradient(to right, #ecf5ff, #f0f9ff) !important;
+  border-left: 3px solid #409EFF;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 16px !important;  /* 确保内边距足够 */
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加背景装饰 */
+.thinking-bubble::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(64, 158, 255, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  z-index: 0;
+  animation: pulse-bg 4s infinite ease-in-out;
+}
+
+@keyframes pulse-bg {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.4;
+  }
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.thinking-icon {
+  color: #409EFF;
+  font-size: 18px;
+  animation: rotate 1.5s linear infinite;
+}
+
+.thinking-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: #409EFF;
+  animation: pulse 1.5s infinite;
+}
+
+.thinking-detail {
+  font-size: 14px;
+  color: #606266;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+/* 打字指示器样式 */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  height: 24px;
+  margin-top: 4px;
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(to bottom right, #409EFF, #75b9ff);
+  opacity: 0.8;
+  animation: bounce 1.4s infinite ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+    background: #409EFF;
+    box-shadow: 0 4px 8px rgba(64, 158, 255, 0.4);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 思考动画样式 */
+.thinking-animation {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 5px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.brain-animation {
+  position: relative;
+  width: 200px;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(64, 158, 255, 0.1);
+}
+
+.brain-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.brain-wave {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.3), rgba(64, 158, 255, 0.1));
+  animation: brain-wave 4s infinite;
+  box-shadow: 0 0 15px rgba(64, 158, 255, 0.2);
+}
+
+.brain-wave:nth-child(2) {
+  animation-delay: 0.7s;
+}
+
+.brain-wave:nth-child(3) {
+  animation-delay: 1.4s;
+}
+
+@keyframes brain-wave {
+  0% {
+    transform: scale(0);
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+  .thinking-bubble {
+    min-width: 150px;
+    padding: 12px !important;
+  }
+  
+  .brain-animation {
+    width: 150px;
+  }
+  
+  .thinking-text {
+    font-size: 14px;
+  }
+  
+  .thinking-detail {
+    font-size: 13px;
   }
 }
 </style>

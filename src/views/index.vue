@@ -6,8 +6,8 @@
     <!-- Hero Section -->
     <section class="hero">
       <div class="container hero-content">
-        <h1>多模态英语教学与评估平台</h1>
-        <p>运用AI技术，提升您的演讲技能</p>
+        <h1 class="main-title">多模态英语教学与评估平台</h1>
+        <p class="tagline">AI助力言之邮理，AI助力您言之有理</p>
       </div>
     </section>
 
@@ -21,7 +21,7 @@
                class="feature-wrapper">
             <div class="feature-card" 
                  @click="handleFeatureClick(feature.id)"
-                 :class="{ clickable: feature.id === 1 || feature.id === 2 }">
+                 :class="{ clickable: feature.id === 1 || feature.id === 2 || feature.id === 3 || feature.id === 4 }">
               <h3>{{ feature.title }}</h3>
               <p>{{ feature.description }}</p>
             </div>
@@ -59,7 +59,7 @@ export default {
         {
           id: 1,
           title: "演讲稿智能写作与评价",
-          description: "依托先进的大语言模型技术，为演讲稿写作提供翻译、续写、润色等支持",
+          description: "依托先进大语言模型技术，为演讲稿写作提供一键评价、整体润色、智能续写、多语翻译等服务",
           icon: require('@/assets/selfpractice.png'),
           iconTextEn: "Self Practice",
           iconTextCn: "自我训练"
@@ -67,15 +67,15 @@ export default {
         {
           id: 2,
           title: "演讲视频智能评价",
-          description: "全面评估演讲视频中演讲者的姿态、语调和情感表现，并提供针对性优化建议",
+          description: "依托多模态学习分析技术，为演讲视频提供演讲者姿态、语音语调和情感表现等方面的智能评价",
           icon: require('@/assets/客户档案.png'),
           iconTextEn: "Anxiety Detection",
           iconTextCn: "焦虑检测"
         },
         {
           id: 3,
-          title: "公众演讲多模态智能评价",
-          description: "融合视频、音频、演讲稿、PPT等多维数据，提供全方位演讲能力测评报告",
+          title: "公众演讲多模态教学与智能评价",
+          description: "全面支撑教师、学生公众演讲的教与学，围绕演讲视频、音频、演讲稿、PPT等多模态数据，提供全面测评报告",
           icon: require('@/assets/绩效设置汇总.png'),
           iconTextEn: "Visual Analysis",
           iconTextCn: "可视化分析"
@@ -92,7 +92,7 @@ export default {
       stats: [
         {
           id: 1,
-          number: "500+",
+          number: "600+",
           label: "学习者"
         },
         {
@@ -102,7 +102,7 @@ export default {
         },
         {
           id: 3,
-          number: "500+",
+          number: "600+",
           label: "活跃用户"
         },
         {
@@ -126,6 +126,59 @@ export default {
       } else if (featureId === 2) {
         // 跳转到视频分析页面
         this.$router.push('/homeworkTrial/video/index');
+      } else if (featureId === 3) {
+        // 根据用户角色跳转到不同页面
+        const roles = this.$store.getters.roles;
+        console.log("用户角色信息:", roles);
+        
+        // 检查用户是否已登录
+        if (!roles || (Array.isArray(roles) && roles.length === 0)) {
+          this.$message.warning('请先登录以访问此功能');
+          return;
+        }
+        
+        // 分析角色数据结构并获取角色ID
+        let roleId = null;
+        
+        // 如果roles是字符串数组
+        if (Array.isArray(roles) && typeof roles[0] === 'string') {
+          roleId = roles.includes('admin') ? 1 : 2;
+        } 
+        // 如果roles是对象数组
+        else if (Array.isArray(roles) && typeof roles[0] === 'object') {
+          const role = roles[0];
+          if (role.roleId) {
+            roleId = role.roleId;
+          } else if (role.id) {
+            roleId = role.id;
+          } else if (role.value) {
+            roleId = role.value;
+          }
+        }
+        // 如果roles是单个对象
+        else if (typeof roles === 'object' && !Array.isArray(roles)) {
+          if (roles.roleId) {
+            roleId = roles.roleId;
+          } else if (roles.id) {
+            roleId = roles.id;
+          } else if (roles.value) {
+            roleId = roles.value;
+          }
+        }
+        
+        console.log("解析得到的角色ID:", roleId);
+        
+        // 根据角色ID决定跳转页面
+        if (roleId === 1 || roles.includes('admin')) {
+          // 教师/管理员 - 跳转到作业管理
+          this.$router.push('/homeworkManage/index');
+        } else {
+          // 学生 - 跳转到我的任务
+          this.$router.push('/myTask/myEvaluation/index');
+        }
+      } else if (featureId === 4) {
+        // 跳转到音频评估页面
+        this.$router.push('/homeworkTrial/audio/index');
       }
     },
     async processVideo() {
@@ -275,6 +328,59 @@ export default {
     margin-bottom: 1rem;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     letter-spacing: 1px;  // 增加字距
+  }
+}
+
+.main-title {
+  font-size: 3.8rem !important;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 
+    0 2px 0 #ccc,
+    0 4px 0 #999,
+    0 6px 10px rgba(0, 0, 0, 0.6),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+  margin-bottom: 1.5rem !important;
+  animation: fadeInDown 1s ease-out forwards;
+  font-family: "Microsoft YaHei", sans-serif;
+  letter-spacing: 3px;
+  transform: perspective(500px) rotateX(5deg);
+}
+
+.tagline {
+  font-size: 1.8rem !important;
+  font-weight: 500;
+  color: #ffffff;
+  text-shadow: 
+    0 1px 0 #ccc,
+    0 2px 0 #999,
+    0 4px 6px rgba(0, 0, 0, 0.6),
+    0 5px 10px rgba(0, 0, 0, 0.4);
+  letter-spacing: 1.5px !important;
+  animation: fadeInUp 1.2s ease-out forwards;
+  font-family: "Microsoft YaHei", sans-serif;
+  transform: perspective(500px) rotateX(3deg);
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -37,26 +37,8 @@ export default {
     return {
       menuItems: [
         { 
-          type: 'translate', 
-          text: '翻译',
-          description: '将选中文本翻译为简体中文/英文',
-          prompt: `请将以下文本进行翻译：
-如果原文是中文，请翻译成地道的英文；
-如果原文是英文，请翻译成优美的简体中文。
-请确保：
-1. 准确传达原文含义
-2. 符合目标语言的表达习惯
-3. 保持专业术语的准确性
-4. 维持原文的语气和风格
-
-
-原文：
-{text}
-`
-        },
-        { 
           type: 'continue', 
-          text: '续写',
+          text: '智能续写',
           description: '基于选中内容智能续写',
           prompt: `请基于以下内容进行续写，保持语言风格、叙述视角和行文逻辑。
          续写要求：
@@ -74,7 +56,7 @@ export default {
         },
         { 
           type: 'polish', 
-          text: '润色',
+          text: '句子润色',
           description: '优化语言表达和用词',
           prompt: `请对以下文本进行精细润色，提升其表达质量
           
@@ -92,7 +74,7 @@ export default {
         },
         { 
           type: 'summarize', 
-          text: '概括',
+          text: '整体概括',
           description: '提取核心内容要点',
           prompt: `请对以下文本进行精炼的总结概括
          概括要求：
@@ -111,28 +93,8 @@ export default {
 `
         },
         { 
-          type: 'expand', 
-          text: '扩写',
-          description: '扩充内容和细节',
-          prompt: `请对以下文本进行合理的扩充和丰富：
-        扩写要求：
-1. 补充相关的细节和例证
-2. 深化核心观点的论述
-3. 增加必要的背景信息
-4. 保持内容的连贯性
-5. 维持原有的语言风格
-6. 确保扩写内容与原文主题相关
-7. 给出中文扩写和英文扩写
-          
-原文：
-{text}
-
-
-`
-        },
-        { 
           type: 'shorten', 
-          text: '缩写',
+          text: '段落缩写',
           description: '精简文本保留重点',
           prompt: `请在保留核心内容的前提下，对以下文本进行精炼缩写
           
@@ -151,6 +113,50 @@ export default {
 
 
 `
+        },
+        { 
+          type: 'expand', 
+          text: '段落扩写',
+          description: '扩充内容和细节',
+          prompt: `请对以下文本进行合理的扩充和丰富：
+        扩写要求：
+1. 补充相关的细节和例证
+2. 深化核心观点的论述
+3. 增加必要的背景信息
+4. 保持内容的连贯性
+5. 维持原有的语言风格
+6. 确保扩写内容与原文主题相关
+7. 给出中文扩写和英文扩写
+          
+原文：
+{text}
+
+
+`
+        },
+        { 
+          type: 'translate', 
+          text: '多语翻译',
+          description: '将选中文本翻译为简体中文/英文',
+          prompt: `请将以下文本进行翻译：
+如果原文是中文，请翻译成地道的英文；
+如果原文是英文，请翻译成优美的简体中文。
+请确保：
+1. 准确传达原文含义
+2. 符合目标语言的表达习惯
+3. 保持专业术语的准确性
+4. 维持原文的语气和风格
+
+
+原文：
+{text}
+`
+        },
+        { 
+          type: 'custom', 
+          text: '其他个性化',
+          description: '自定义AI交互',
+          action: 'sendToChat'
         }
       ]
     }
@@ -175,10 +181,22 @@ export default {
 
         const text = quill.getText(savedSelection.index, savedSelection.length)
         // console.log('AISidebar - Selected Text:', text)
-        this.$emit('action', {
-          type: item.type,
-          prompt: item.prompt.replace('{text}', text)
-        })
+        
+        if (item.action === 'sendToChat') {
+          // 发送到聊天输入框，添加明确的提示格式
+          const formattedText = `【以下是选中的原文】：
+"${text}"
+
+【我的要求】：
+`
+          this.$bus.$emit('insertToChat', formattedText)
+        } else {
+          // 常规AI操作
+          this.$emit('action', {
+            type: item.type,
+            prompt: item.prompt.replace('{text}', text)
+          })
+        }
       } else {
         // console.log('AISidebar - No Selection')
         this.$message.warning('请先选择文本')
@@ -191,7 +209,8 @@ export default {
         polish: 'el-icon-magic-stick',
         summarize: 'el-icon-reading',
         expand: 'el-icon-full-screen',
-        shorten: 'el-icon-crop'
+        shorten: 'el-icon-crop',
+        custom: 'el-icon-more'
       }
       return icons[type]
     }
@@ -263,20 +282,24 @@ export default {
 }
 
 .sidebar-item {
-  padding: 8px 0;
+  padding: 10px 0;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  background: rgba(255, 255, 255, 0.6);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(245, 247, 250, 0.9));
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  margin: 0 4px;
+  animation: fadeIn 0.5s ease-out forwards;
+  animation-fill-mode: both;
 }
 
 .sidebar-item:nth-child(1) { animation-delay: 0.1s; }
@@ -285,38 +308,44 @@ export default {
 .sidebar-item:nth-child(4) { animation-delay: 0.4s; }
 .sidebar-item:nth-child(5) { animation-delay: 0.5s; }
 .sidebar-item:nth-child(6) { animation-delay: 0.6s; }
+.sidebar-item:nth-child(7) { animation-delay: 0.7s; }
 
 .sidebar-item:hover {
   background: linear-gradient(135deg, rgba(64, 158, 255, 0.15) 0%, rgba(103, 194, 255, 0.15) 100%);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 6px 15px rgba(64, 158, 255, 0.25);
+  border: 1px solid rgba(64, 158, 255, 0.3);
+  z-index: 1;
 }
 
 .icon-wrapper {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background: rgba(64, 158, 255, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.15), rgba(64, 158, 255, 0.25));
   backdrop-filter: blur(4px);
-  border: 1px solid rgba(64, 158, 255, 0.2);
+  border: 1px solid rgba(64, 158, 255, 0.3);
   transition: all 0.3s ease;
+  box-shadow: 0 3px 8px rgba(64, 158, 255, 0.2);
 }
 
 .icon-wrapper i {
-  font-size: 16px;
+  font-size: 18px;
   color: #409EFF;
   transition: all 0.3s ease;
+  text-shadow: 0 0 8px rgba(64, 158, 255, 0.3);
 }
 
 .action-title {
-  font-size: 12px;
+  font-size: 13px;
   color: #606266;
   text-align: center;
-  font-weight: 500;
+  font-weight: 600;
   transition: all 0.3s ease;
+  letter-spacing: 0.5px;
 }
 
 .sidebar-items::-webkit-scrollbar {
@@ -372,19 +401,21 @@ export default {
 }
 
 .sidebar-item:hover .icon-wrapper {
-  background: #409EFF;
-  transform: translateY(-2px) rotate(8deg);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+  background: linear-gradient(135deg, #409EFF, #007bff);
+  transform: translateY(-3px) rotate(8deg);
+  box-shadow: 0 6px 15px rgba(64, 158, 255, 0.4);
 }
 
 .sidebar-item:hover .icon-wrapper i {
   transform: scale(1.2);
   color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .sidebar-item:hover .action-title {
   color: #409EFF;
-  text-shadow: 0 0 8px rgba(64, 158, 255, 0.3);
+  text-shadow: 0 0 10px rgba(64, 158, 255, 0.3);
+  transform: translateY(2px);
 }
 
 @keyframes neonGlow {

@@ -424,7 +424,13 @@ export const dynamicRoutes = [
         path: 'video/index',
         name: 'homeworkTrial_video',
         component: () => import('@/views/homeworkTrial/video/index.vue'),
-        meta: { title: '演讲视频录制', roles: ['common'], icon: 'tab' }
+        meta: { title: '演讲视频智能评价', roles: ['common'], icon: 'tab' }
+      },
+      {
+        path: 'audio/index',
+        name: 'homeworkTrial_audio',
+        component: () => import('@/views/homeworkTrial/audio/index.vue'),
+        meta: { title: '英语语音智能评价', roles: ['common'], icon: 'tab' }
       }
     ]
   },

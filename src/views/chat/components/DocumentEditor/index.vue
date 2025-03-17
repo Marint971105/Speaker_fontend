@@ -40,7 +40,8 @@ export default {
 9. 基本无语法错误<grammar>
 10. 整体谋篇布局合理<organization>
 11. 内容切题<relevancy>
-
+要求：（1）请从0-100分进行打分，分数越高，说明质量越好。
+（2）请给出具体的打分理由。并且给出实例。并且给出对相关语句具体的修改建议。
 演讲稿内容如下：
 {text}`,
         polish: `请对以下演讲稿进行润色，使其更加流畅、专业和富有感染力，同时保持原文的语种（英语/中文）和其核心内容和风格：
@@ -79,7 +80,8 @@ export default {
     // 处理文件下载
     async downloadDoc() {
       try {
-        const html = this.$refs.editor.getContent()
+        // 直接从 this.content 获取内容，而不是调用 getContent 方法
+        const html = this.content
         
         // 配置文档选项
         const options = {

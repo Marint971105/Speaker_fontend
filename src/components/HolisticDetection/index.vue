@@ -4,8 +4,12 @@
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
-    <div v-else-if="!isMediaPipeReady" class="loading-message">
-      Loading MediaPipe...
+    <div v-else-if="!isMediaPipeReady" class="loading-container">
+      <div class="loading-content">
+        <div class="loading-spinner mediapipe-spinner"></div>
+        <p>正在加载 MediaPipe...</p>
+        <p class="loading-subtitle">首次加载可能需要一些时间，请耐心等待</p>
+      </div>
     </div>
     <div v-else class="content-wrapper">
       <!-- 第一行卡片 -->
@@ -39,16 +43,6 @@
               </span>
               <span class="button-text">{{ videoRunning ? '停止' : '开始' }}</span>
             </button>
-            <button 
-              class="custom-button analyze-button"
-              @click="analyzeAnxiety"
-              :disabled="!inputVideo || isAnalyzing"
-            >
-              <span class="button-icon">
-                <i class="fas fa-brain"></i>
-              </span>
-              <span class="button-text">分析焦虑</span>
-            </button>
           </div>
 
           <div class="video-container">
@@ -72,6 +66,18 @@
         <div class="videoView">
           <div class="control-panel">
             <span class="processing-status">MediaPipe 处理结果</span>
+            <div class="mediapipe-controls">
+              <button 
+                class="custom-button mediapipe-button"
+                @click="toggleMediaPipe"
+                :disabled="!inputVideo"
+              >
+                <span class="button-icon">
+                  <i :class="isMediaPipeActive ? 'fas fa-pause' : 'fas fa-play'"></i>
+                </span>
+                <span class="button-text">{{ isMediaPipeActive ? '暂停处理' : '开始处理' }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="video-container">
@@ -95,6 +101,18 @@
         <div class="videoView">
           <div class="control-panel">
             <span class="processing-status">焦虑分析结果</span>
+            <div class="anxiety-controls">
+              <button 
+                class="custom-button analyze-button"
+                @click="analyzeAnxiety"
+                :disabled="!inputVideo || isAnalyzing"
+              >
+                <span class="button-icon">
+                  <i class="fas fa-brain"></i>
+                </span>
+                <span class="button-text">分析焦虑</span>
+              </button>
+            </div>
             <div class="analysis-status" v-if="isAnalyzing">
               <i class="fas fa-spinner fa-spin"></i>
               <span>正在分析...</span>
@@ -228,6 +246,7 @@ export default {
       lastVideoTime: -1,
       inputVideo: null,
       isMediaPipeReady: false,
+      isMediaPipeActive: false,
       
       // 焦虑分析相关状态
       isAnalyzing: false,
@@ -499,6 +518,7 @@ export default {
     startProcessing() {
       console.log('开始处理视频')
       this.videoRunning = true
+      this.isMediaPipeActive = true
       this.processVideo()
     },
 
@@ -513,8 +533,8 @@ export default {
       const video = this.$refs.inputVideo
 
       try {
-        // 确保视频准备就绪
-        if (video.readyState >= 2) {
+        // 确保视频准备就绪且MediaPipe处理是激活的
+        if (video.readyState >= 2 && this.isMediaPipeActive) {
           await this.holistic.send({image: video})
         }
 
@@ -898,6 +918,52 @@ export default {
       
       // 继续动画循环
       this.audioAnimationFrameId = requestAnimationFrame(this.drawAudioSpectrum);
+    },
+
+    // 新增方法：切换MediaPipe处理
+    toggleMediaPipe() {
+      this.isMediaPipeActive = !this.isMediaPipeActive;
+      
+      // 如果激活处理但视频当前没有运行处理，则重新开始处理
+      if (this.isMediaPipeActive && this.videoRunning) {
+        this.processVideo();
+      }
+      
+      // 如果停止处理，则清除Canvas
+      if (!this.isMediaPipeActive) {
+        this.clearOutputCanvas();
+      }
+    },
+    
+    // 新增方法：清除输出Canvas
+    clearOutputCanvas() {
+      if (this.$refs.outputCanvas) {
+        const canvasElement = this.$refs.outputCanvas;
+        const canvasCtx = canvasElement.getContext("2d");
+        
+        // 清除整个画布
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        // 绘制暂停符号（考虑镜像效果）
+        const centerX = canvasElement.width / 2;
+        const centerY = canvasElement.height / 2;
+        const size = 80; // 符号大小
+        
+        // 绘制半透明背景圆
+        canvasCtx.beginPath();
+        canvasCtx.arc(centerX, centerY, size, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        canvasCtx.fill();
+        
+        // 绘制两条暂停线（对称图形，不受镜像影响）
+        canvasCtx.fillStyle = '#FFFFFF';
+        
+        // 左侧暂停线
+        canvasCtx.fillRect(centerX - 30, centerY - 25, 20, 50);
+        
+        // 右侧暂停线
+        canvasCtx.fillRect(centerX + 10, centerY - 25, 20, 50);
+      }
     }
   }
 }
@@ -1364,5 +1430,59 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* MediaPipe控制按钮样式 */
+.mediapipe-button {
+  background-color: #4CAF50;
+}
+
+.mediapipe-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* MediaPipe加载样式 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.loading-content {
+  text-align: center;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  max-width: 400px;
+}
+
+.mediapipe-spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #4CAF50;
+  margin-bottom: 20px;
+}
+
+.loading-subtitle {
+  color: #777;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* 焦虑分析控制样式 */
+.anxiety-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
 }
 </style>

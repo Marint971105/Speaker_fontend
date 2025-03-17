@@ -14,8 +14,8 @@
           <el-button size="small" @click="handleDownload">下载文档</el-button>
         </div>
         <div class="right-buttons">
-          <el-button size="small" type="primary" @click="handleEvaluate">完整评估</el-button>
-          <el-button size="small" type="success" @click="handlePolish">整体润色</el-button>
+          <el-button size="small" type="primary" @click="handleEvaluate">一键评估</el-button>
+          <el-button size="small" type="success" @click="handlePolish">一键润色</el-button>
         </div>
       </div>
     </div>
@@ -35,7 +35,7 @@
 
     <!-- 底部状态栏 -->
     <div class="editor-footer">
-      <div class="word-count">
+      <div class="word-count" :class="{ warning: wordCount > maxWords }">
         <span>字数：{{ wordCount }}</span>
         <span class="separator">|</span>
         <span>字符数：{{ charCount }}</span>
@@ -78,7 +78,7 @@ export default {
       charCount: 0,
       maxWords: 1500,
       editorOption: {
-        placeholder: '请输入内容...',
+        placeholder: '请在这里撰写您的演讲稿内容...（Please write your speech here.）',
         theme: 'snow',
         bounds: '.editor-body',
         modules: {
@@ -196,6 +196,10 @@ export default {
 
     handlePolish() {
       this.$emit('polish', this.content)
+    },
+
+    getContent() {
+      return this.content
     },
 
     updateWordCount(text) {
@@ -339,10 +343,40 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: v-bind(wordCount > maxWords ? '#f56c6c' : '#606266');
+  color: #606266;
+}
+
+.word-count.warning {
+  color: #f56c6c;
 }
 
 .separator {
   color: #dcdfe6;
+}
+
+.right-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.right-buttons .el-button {
+  font-weight: 600;
+  padding: 8px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.right-buttons .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.right-buttons .el-button--primary {
+  background: linear-gradient(135deg, #409EFF, #007bff);
+}
+
+.right-buttons .el-button--success {
+  background: linear-gradient(135deg, #67C23A, #41a314);
 }
 </style>
