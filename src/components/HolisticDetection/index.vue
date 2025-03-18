@@ -43,6 +43,16 @@
               </span>
               <span class="button-text">{{ videoRunning ? '停止' : '开始' }}</span>
             </button>
+            <button 
+              class="custom-button danger-button"
+              @click="clearVideo"
+              :disabled="!inputVideo"
+            >
+              <span class="button-icon">
+                <i class="fas fa-trash-alt"></i>
+              </span>
+              <span class="button-text">清除视频</span>
+            </button>
           </div>
 
           <div class="video-container">
@@ -65,7 +75,7 @@
         <!-- 右侧 MediaPipe 处理结果区域 -->
         <div class="videoView">
           <div class="control-panel">
-            <span class="processing-status">MediaPipe 处理结果</span>
+            <span class="processing-status">MediaPipe 处理结果 <small>(需手动点击启动)</small></span>
             <div class="mediapipe-controls">
               <button 
                 class="custom-button mediapipe-button"
@@ -130,6 +140,26 @@
               <p>正在分析视频，请稍候...</p>
               <div class="progress-bar">
                 <div class="progress" :style="{width: `${analysisProgress}%`}"></div>
+              </div>
+            </div>
+            
+            <div v-if="anxietyResult && anxietyResult.error" class="anxiety-result error-result">
+              <div class="result-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>视频检测异常</h3>
+              </div>
+              
+              <div class="error-content">
+                <p>{{ anxietyResult.message }}</p>
+                <div class="error-actions">
+                  <button 
+                    class="custom-button primary-button" 
+                    @click="$refs.videoInput.click()"
+                  >
+                    <i class="fas fa-upload"></i>
+                    <span>重新上传视频</span>
+                  </button>
+                </div>
               </div>
             </div>
             
@@ -265,7 +295,10 @@ export default {
       audioDataArray: null,
       isAudioVisualizationActive: false,
       audioAnimationFrameId: null,
-      audioAnalysisStats: null
+      audioAnalysisStats: null,
+      
+      // 视频有效性检查相关
+      isVideoValid: true // 默认视频有效
     }
   },
   computed: {
@@ -396,10 +429,7 @@ export default {
     }
   },
   beforeDestroy() {
-    this.cleanupAudio()
-    if (this.inputVideo) {
-      URL.revokeObjectURL(this.inputVideo.src)
-    }
+    this.clearVideo();
   },
   methods: {
     async initializeHolistic() {
@@ -460,37 +490,78 @@ export default {
     async handleVideoUpload(event) {
       const file = event.target.files[0]
       if (!file) return
-
+      
       try {
+        // 重置状态
+        this.anxietyResult = null
+        this.error = null
+        this.isVideoValid = false
+        
         const video = this.$refs.inputVideo
-        video.src = URL.createObjectURL(file)
+        
+        // 清理之前的资源
+        this.cleanupAudio()
+        if (video.src) {
+          URL.revokeObjectURL(video.src)
+        }
+        
+        // 创建对象URL
+        const videoUrl = URL.createObjectURL(file)
+        video.src = videoUrl
         this.inputVideo = file
-
-        // 重置分析结果
-        this.anxietyResult = null;
-        this.cleanupAudio(); // 清理之前的音频分析
-
+        
         // 等待视频元数据加载
-        await new Promise(resolve => {
+        await new Promise((resolve, reject) => {
           video.onloadedmetadata = resolve
+          video.onerror = () => reject(new Error('视频加载失败'))
+          
+          // 添加超时处理
+          const timeout = setTimeout(() => {
+            reject(new Error('视频加载超时'))
+          }, 10000) // 10秒超时
+          
+          // 清理超时
+          video.onloadedmetadata = () => {
+            clearTimeout(timeout)
+            resolve()
+          }
         })
-
+        
+        console.log('视频元数据加载完成，duration:', video.duration)
+        
+        // 设置视频为有效
+        this.isVideoValid = true
+        
         // 初始化音频分析
-        this.setupAudioAnalysis();
-
-        // 移除旧的事件监听器
+        this.setupAudioAnalysis()
+        
+        // 添加事件监听器
         video.removeEventListener('play', this.startProcessing)
         video.removeEventListener('pause', this.stopProcessing)
-        
-        // 添加新的事件监听器
         video.addEventListener('play', this.startProcessing)
         video.addEventListener('pause', this.stopProcessing)
         
         // 添加音频相关事件
+        video.removeEventListener('play', this.startAudioVisualization)
+        video.removeEventListener('pause', this.stopAudioVisualization)
         video.addEventListener('play', this.startAudioVisualization)
         video.addEventListener('pause', this.stopAudioVisualization)
+        
+        // 成功提示
+        this.$message({
+          message: '视频加载成功，可以进行焦虑分析',
+          type: 'success',
+          duration: 3000
+        })
       } catch (err) {
+        console.error('视频加载失败:', err)
         this.error = '视频加载失败: ' + err.message
+        
+        // 清理可能创建的资源
+        if (this.inputVideo) {
+          URL.revokeObjectURL(this.$refs.inputVideo.src)
+          this.inputVideo = null
+        }
       }
     },
 
@@ -518,8 +589,11 @@ export default {
     startProcessing() {
       console.log('开始处理视频')
       this.videoRunning = true
-      this.isMediaPipeActive = true
-      this.processVideo()
+      
+      // 仅当MediaPipe是激活状态时才处理视频
+      if (this.isMediaPipeActive) {
+        this.processVideo()
+      }
     },
 
     stopProcessing() {
@@ -605,12 +679,22 @@ export default {
 
     // 新增焦虑分析相关方法
     async analyzeAnxiety() {
-      if (!this.inputVideo || this.isAnalyzing) return;
+      if (!this.inputVideo || this.isAnalyzing) return
       
-      this.isAnalyzing = true;
-      this.analysisProgress = 0;
-      this.anxietyResult = null;
-      this.error = null;
+      // 如果视频尚未检测或被标记为无效，阻止分析
+      if (!this.isVideoValid) {
+        this.$message({
+          message: '视频未通过检测，无法进行焦虑分析',
+          type: 'warning',
+          duration: 3000
+        })
+        return
+      }
+      
+      this.isAnalyzing = true
+      this.analysisProgress = 0
+      this.anxietyResult = null
+      this.error = null
       
       try {
         // 模拟上传进度
@@ -963,6 +1047,46 @@ export default {
         
         // 右侧暂停线
         canvasCtx.fillRect(centerX + 10, centerY - 25, 20, 50);
+      }
+    },
+
+    async clearVideo() {
+      // 添加确认对话框
+      if (!await this.$confirm('确定要清除当前视频吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).catch(() => false)) {
+        return;
+      }
+
+      try {
+        // 执行原有的清理操作
+        if (this.videoRunning) {
+          this.stopVideo();
+        }
+
+        if (this.isMediaPipeActive) {
+          this.toggleMediaPipe();
+        }
+
+        if (this.isAudioVisualizationActive) {
+          this.stopAudioVisualization();
+        }
+
+        this.cleanupAudio();
+
+        if (this.inputVideo) {
+          URL.revokeObjectURL(this.$refs.inputVideo.src);
+        }
+
+        // 重新加载页面
+        window.location.reload();
+        
+      } catch (error) {
+        console.error('清理资源失败:', error);
+        // 如果清理失败，仍然强制刷新页面
+        window.location.reload();
       }
     }
   }
@@ -1484,5 +1608,56 @@ export default {
   align-items: center;
   gap: 8px;
   margin-left: 10px;
+}
+
+/* 在已有的按钮样式基础上添加 */
+.danger-button {
+  background-color: #dc3545;
+}
+
+.danger-button:hover {
+  background-color: #c82333;
+}
+
+/* 调整按钮间距 */
+.control-panel .custom-button {
+  margin-right: 8px;
+}
+
+.control-panel .custom-button:last-child {
+  margin-right: 0;
+}
+
+/* 错误结果样式 */
+.error-result {
+  background-color: #fff8f8;
+}
+
+.error-result .result-header i {
+  color: #ff4444;
+}
+
+.error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.error-content p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 25px;
+}
+
+.error-actions {
+  margin-top: 20px;
+}
+
+/* 检测中状态展示 */
+.video-checking-overlay {
+  display: none; /* 直接隐藏，避免影响已有样式 */
 }
 </style>
