@@ -115,6 +115,7 @@ export default {
       maxConcurrent: 3, // 最大并发数
       running: 0, // 当前运行的请求数
       cacheExpireTime: 5 * 60 * 1000, // 缓存过期时间5分钟
+      pendingRequests: new Map() // 添加这一行
     };
   },
   computed: {

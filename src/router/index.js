@@ -403,22 +403,10 @@ export const dynamicRoutes = [
     ],
   },
   {
-    path: '/chat',
-    component: Layout,
-    children: [
-      {
-        path: 'index',
-        name: 'Chat',
-        component: () => import('@/views/chat/index'),
-        meta: { title: '演讲稿写作', roles: ['common'], icon: 'message' }
-      }
-    ]
-  },
-  {
     path: '/homeworkTrial/',
     component: Layout,
     hidden: false,
-    meta: { title: '作业试做', icon: 'user' },
+    meta: { title: '特色功能', icon: 'user' },
     children: [
       {
         path: 'video/index',
@@ -431,6 +419,12 @@ export const dynamicRoutes = [
         name: 'homeworkTrial_audio',
         component: () => import('@/views/homeworkTrial/audio/index.vue'),
         meta: { title: '英语语音智能评价', roles: ['common'], icon: 'tab' }
+      },
+      {
+        path: 'chat/index',
+        name: 'homeworkTrial_chat',
+        component: () => import('@/views/chat/index'),
+        meta: { title: '演讲稿智能写作', roles: ['common'], icon: 'message' }
       }
     ]
   },

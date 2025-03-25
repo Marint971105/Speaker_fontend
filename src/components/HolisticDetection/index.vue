@@ -429,7 +429,7 @@ export default {
     }
   },
   beforeDestroy() {
-    this.clearVideo();
+    // 移除自动清除视频的调用
   },
   methods: {
     async initializeHolistic() {
@@ -1061,7 +1061,7 @@ export default {
       }
 
       try {
-        // 执行原有的清理操作
+        // 执行清理操作
         if (this.videoRunning) {
           this.stopVideo();
         }
@@ -1078,17 +1078,45 @@ export default {
 
         if (this.inputVideo) {
           URL.revokeObjectURL(this.$refs.inputVideo.src);
+          this.inputVideo = null;
         }
 
-        // 重新加载页面
-        window.location.reload();
+        // 清除评价结果
+        this.anxietyResult = null;
+        this.analysisProgress = 0;
+        this.isAnalyzing = false;
+        
+        // 清除音频分析结果
+        this.audioAnalysisStats = null;
+        
+        // 清除错误信息
+        this.error = null;
+        
+        // 重置视频有效性状态
+        this.isVideoValid = true;
+        
+        // 清除画布
+        this.clearOutputCanvas();
+        
+        // 提示用户
+        this.$message({
+          message: '视频已清除',
+          type: 'success'
+        });
         
       } catch (error) {
         console.error('清理资源失败:', error);
-        // 如果清理失败，仍然强制刷新页面
-        window.location.reload();
+        this.$message.error('清理视频失败');
       }
-    }
+    },
+    handleBeforeUnload() {
+      // 只在系统退出时清除所有数据
+      if (this.inputVideo) {
+        URL.revokeObjectURL(this.$refs.inputVideo.src);
+      }
+      this.cleanupAudio();
+      this.clearChatHistory();
+    },
   }
 }
 </script>

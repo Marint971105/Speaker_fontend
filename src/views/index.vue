@@ -122,7 +122,7 @@ export default {
     handleFeatureClick(featureId) {
       if (featureId === 1) {
         // 跳转到演讲稿写作页面
-        this.$router.push('/chat/index');
+        this.$router.push('/homeworkTrial/chat/index');
       } else if (featureId === 2) {
         // 跳转到视频分析页面
         this.$router.push('/homeworkTrial/video/index');

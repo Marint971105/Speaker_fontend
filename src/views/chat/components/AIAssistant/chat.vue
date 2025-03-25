@@ -3,8 +3,8 @@
     <div class="chat-container">
       <div class="chat-messages" ref="chatContainer">
         <div 
-          v-for="(message, index) in messages" 
-          :key="message.id || index"
+          v-for="(message, index) in displayMessages" 
+          :key="`msg_${message.id}_${index}`"
           class="message"
           :class="message.role"
         >
@@ -12,40 +12,15 @@
             <div class="message-avatar">
               <el-avatar :size="36" :icon="message.role === 'assistant' ? 'el-icon-service' : 'el-icon-user'" />
             </div>
-            <div class="message-bubble">
+            <div class="message-bubble" :class="{ 'error-message': message.isError }">
               <div v-if="message.role === 'assistant'"
                    class="markdown-body"
                    v-html="renderMarkdown(message.content)">
               </div>
               <div v-else>{{ message.content }}</div>
-            </div>
-          </div>
-        </div>
-        <!-- 加载动画 -->
-        <div v-if="isLoading" class="message assistant">
-          <div class="message-content">
-            <div class="message-avatar">
-              <el-avatar :size="36" icon="el-icon-service" />
-            </div>
-            <div class="message-bubble thinking-bubble">
-              <div class="thinking-header">
-                <i class="el-icon-loading thinking-icon"></i>
-                <div class="thinking-text">AI助手思考中</div>
-              </div>
-              <div class="thinking-detail">大语言模型正在深度思考并生成回复，这可能需要一些时间...</div>
-              <div class="thinking-animation">
-                <div class="brain-animation">
-                  <div class="brain-container">
-                    <div class="brain-wave"></div>
-                    <div class="brain-wave"></div>
-                    <div class="brain-wave"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
+              <!-- 错误消息重试按钮 -->
+              <div v-if="message.isError" class="error-actions">
+                <el-button size="mini" type="primary" @click="retryLastMessage">重试</el-button>
               </div>
             </div>
           </div>
@@ -55,7 +30,7 @@
       <!-- 输入区域 -->
       <div class="chat-input">
         <el-input
-          v-model="userInput"
+          v-model="inputValue"
           type="textarea"
           :rows="3"
           placeholder="请在这里输入您的要求..."
@@ -65,7 +40,7 @@
           <el-button type="primary" @click="handleSend" :loading="isLoading">
             发送消息
           </el-button>
-          <el-button @click="clearChatHistory">
+          <el-button @click="showClearHistoryDialog">
             清除历史
           </el-button>
         </div>
@@ -75,7 +50,7 @@
 </template>
 
 <script>
-import { sendChatMessage,getHealth } from '@/api/Ollama/chat'
+import { sendChatMessage, sendStreamChatMessage, getHealth } from '@/api/Ollama/chat'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
@@ -84,25 +59,24 @@ export default {
   data() {
     return {
       messages: [],
-      userInput: '',
+      inputValue: '',
       isLoading: false,
-      retryMessage: null, // 用于消息重发
-      messageSequence: 0, // 消息序号
-      isSystemPrompt: false // 添加标记
+      retryingMessageId: null,
+      currentStreamMessage: null,
+      streamMode: true,
+      messageSequence: 0,
+      isSystemPrompt: false
     }
   },
   mounted() {
     this.scrollToBottom()
   },
   async created() {
-    // 初始化设置
-
     this.initializeMarked()
     window.retryLastMessage = this.retryLastMessage.bind(this)
     this.loadMessages()
     await this.checkHealth()
 
-    // 添加欢迎消息
     if (this.messages.length === 0) {
       this.messages.push({
         id: this.getNextSequence(),
@@ -117,11 +91,9 @@ export default {
     this.$bus.$on('insertToChat', this.insertToInput)
   },
   destroyed() {
-    // 移除事件监听
     window.removeEventListener('beforeunload', this.handleBeforeUnload)
     this.$bus.$off('FedLogOut', this.clearChatHistory)
     delete window.retryLastMessage
-    // 确保清除历史
     this.clearChatHistory()
     this.$bus.$off('sendToAI', this.handleIncomingMessage)
     this.$bus.$off('insertToChat', this.insertToInput)
@@ -129,21 +101,23 @@ export default {
   watch: {
     messages: {
       handler(newMessages) {
-        // 保存消息到localStorage
         localStorage.setItem('chatMessages', JSON.stringify(newMessages))
         this.scrollToBottom()
+        
+        // 当消息数量达到一定程度时检查大小
+        if (newMessages.length % 20 === 0 && newMessages.length > 0) {
+          this.checkHistorySize()
+        }
       },
       deep: true
     }
   },
   computed: {
-    // 添加用于显示的消息列表计算属性
     displayMessages() {
       return this.messages.filter(msg => !msg.isSystemPrompt)
     }
   },
   methods: {
-    // 添加新方法
     addWelcomeMessage() {
       this.messages.push({
         id: this.getNextSequence(),
@@ -154,7 +128,31 @@ export default {
     loadMessages() {
       const savedMessages = localStorage.getItem('chatMessages')
       if (savedMessages) {
-        this.messages = JSON.parse(savedMessages)
+        try {
+          const parsed = JSON.parse(savedMessages)
+          let maxId = 0
+          parsed.forEach(msg => {
+            if (msg.id && typeof msg.id === 'number' && msg.id > maxId) {
+              maxId = msg.id
+            }
+          })
+          
+          this.messages = parsed.map((msg, index) => {
+            if (!msg.id) {
+              msg.id = maxId + index + 1
+            }
+            return msg
+          })
+          
+          this.messageSequence = maxId > 0 ? maxId : 0
+          
+          // 加载后检查历史记录大小
+          this.checkHistorySize()
+        } catch (e) {
+          console.error('解析保存的消息失败:', e)
+          this.messages = []
+          this.addWelcomeMessage()
+        }
       } else {
         this.addWelcomeMessage()
       }
@@ -188,82 +186,83 @@ export default {
         this.$message.error('无法连接到AI服务')
       }
     },
-
     getNextSequence() {
-      return ++this.messageSequence
+      const random = Math.floor(Math.random() * 10000);
+      return ++this.messageSequence + '_' + Date.now() + '_' + random;
     },
-    async sendMessage(retry = false) {
-      if ((!this.userInput.trim() && !retry) || this.isLoading) return
-
-      const messageContent = retry ? this.retryMessage.content : this.userInput.trim()
-
-      // 创建用户消息对象
+    async sendMessage() {
+      if (!this.inputValue.trim()) return
+      
       const userMessage = {
-        id: this.getNextSequence(),
+        id: Date.now(),
         role: 'user',
-        content: messageContent,
-        isSystemPrompt: this.isSystemPrompt // 添加标记
+        content: this.inputValue,
+        isSystemPrompt: this.isSystemPrompt
       }
-
-      // 如果不是重试且不是系统prompt，才添加到显示消息中
-      if (!retry && !this.isSystemPrompt) {
-        this.messages.push(userMessage)
+      this.inputValue = ''
+      
+      this.messages.push(userMessage)
+      
+      const tempAiMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: '',
+        isStreaming: true
       }
-
-      this.userInput = ''
-      this.isLoading = true
-      this.retryMessage = null
-
-      try {
-        // 发送消息时，处理历史消息格式
-        const messagesForApi = this.messages.map(msg => ({
+      this.messages.push(tempAiMessage)
+      this.currentStreamMessage = tempAiMessage
+      
+      const historyMessages = this.messages
+        .filter(msg => !msg.isStreaming)
+        .map(msg => ({
           role: msg.role,
           content: msg.content
         }))
-
-        // 如果是系统prompt，添加到API请求中但不显示
-        if (this.isSystemPrompt) {
-          messagesForApi.push({
-            role: 'user',
-            content: messageContent
-          })
-        }
-
-        // 确保加载状态设置为true，显示思考动画
-        this.isLoading = true
-        this.scrollToBottom() // 滚动到底部，确保用户能看到加载动画
-        
-        console.log('发送消息中，显示思考动画...')
-        
-        const response = await sendChatMessage({
-          message: messageContent,
-          conversation_messages: messagesForApi
-        })
-
-        if (response.status === 'success') {
-          console.log('接收到回复，隐藏思考动画')
-          response.data.id = this.getNextSequence()
-          this.messages.push(response.data)
-        } else {
-          throw new Error(response.message || '获取响应失败')
-        }
+      
+      try {
+        await sendStreamChatMessage(
+          {
+            conversation_messages: historyMessages
+          },
+          (chunk) => {
+            if (this.currentStreamMessage) {
+              this.currentStreamMessage.content += chunk
+              this.$nextTick(() => {
+                this.scrollToBottom()
+              })
+            }
+          },
+          (response) => {
+            if (this.currentStreamMessage) {
+              this.currentStreamMessage.isStreaming = false
+              this.currentStreamMessage = null
+            }
+            this.isLoading = false
+          },
+          (error) => {
+            console.error('流式消息发送失败', error)
+            if (this.currentStreamMessage) {
+              this.currentStreamMessage.content = '消息发送失败，请重试。'
+              this.currentStreamMessage.isError = true
+              this.currentStreamMessage.isStreaming = false
+              this.currentStreamMessage = null
+            }
+            this.isLoading = false
+          }
+        )
       } catch (error) {
-        this.$message.error(error.message)
-        this.retryMessage = userMessage
-        this.messages.push({
-          id: this.getNextSequence(),
-          role: 'assistant',
-          content: '消息发送失败。<button class="retry-btn" onclick="window.retryLastMessage()">重试</button>'
-        })
-      } finally {
+        console.error('发送消息失败', error)
+        if (this.currentStreamMessage) {
+          this.currentStreamMessage.content = '消息发送失败，请重试。'
+          this.currentStreamMessage.isError = true
+          this.currentStreamMessage.isStreaming = false
+          this.currentStreamMessage = null
+        }
         this.isLoading = false
-        this.isSystemPrompt = false // 重置标记
       }
     },
-
     handleEnter(e) {
       if (e.ctrlKey || e.shiftKey) {
-        // 允许换行
         return
       }
       this.sendMessage()
@@ -275,22 +274,88 @@ export default {
         }
       })
     },
-    clearChatHistory() {
-      localStorage.removeItem('chatMessages')
-      this.messages = []
-      // 重置消息序号
-      this.messageSequence = 0
-      // 添加欢迎消息
-      this.addWelcomeMessage()
-    },
-    retryLastMessage() {
-      if (this.retryMessage) {
-        // 移除失败提示消息
-        this.messages.pop()
-        this.sendMessage(true)
+    clearChatHistory(keepRecent = false) {
+      if (keepRecent && this.messages.length > 0) {
+        // 获取最近10条消息或者当前显示的所有消息（取较小值）
+        const recentCount = Math.min(10, this.messages.length)
+        const recentMessages = this.messages.slice(-recentCount)
+        
+        localStorage.setItem('chatMessages', JSON.stringify(recentMessages))
+        this.messages = recentMessages
+        
+        this.$message({
+          type: 'success',
+          message: `已清除旧消息，保留了最近${recentCount}条消息`
+        })
+      } else {
+        // 完全清除
+        localStorage.removeItem('chatMessages')
+        this.messages = []
+        this.messageSequence = 0
+        this.addWelcomeMessage()
       }
     },
-    // 处理页面关闭或刷新
+    showClearHistoryDialog() {
+      this.$confirm('您想如何清除历史记录？', '清除历史', {
+        confirmButtonText: '清除全部',
+        cancelButtonText: '取消',
+        distinguishCancelAndClose: true,
+        showClose: true,
+        closeOnClickModal: false,
+        customClass: 'clear-history-dialog',
+        center: true,
+        showCancelButton: true,
+        type: 'warning'
+      }).then(() => {
+        // 清除全部
+        this.clearChatHistory(false)
+        this.$message({
+          type: 'success',
+          message: '已清除全部历史记录'
+        })
+      }).catch(action => {
+        if (action === 'cancel') {
+          // 用户取消操作
+          this.$message({
+            type: 'info',
+            message: '已取消清除操作'
+          })
+        }
+      })
+      
+      // 添加"保留最近"按钮
+      setTimeout(() => {
+        const dialog = document.querySelector('.clear-history-dialog')
+        if (dialog) {
+          const footer = dialog.querySelector('.el-dialog__footer')
+          if (footer) {
+            // 创建"保留最近"按钮
+            const keepRecentBtn = document.createElement('button')
+            keepRecentBtn.className = 'el-button el-button--primary el-button--small'
+            keepRecentBtn.innerHTML = '仅保留最近对话'
+            keepRecentBtn.style.marginRight = '10px'
+            
+            // 添加点击事件
+            keepRecentBtn.addEventListener('click', () => {
+              // 关闭对话框
+              document.querySelector('.clear-history-dialog .el-dialog__headerbtn').click()
+              // 执行保留最近的清除
+              this.clearChatHistory(true)
+            })
+            
+            // 插入按钮
+            footer.insertBefore(keepRecentBtn, footer.firstChild)
+          }
+        }
+      }, 100)
+    },
+    retryLastMessage() {
+      if (this.retryingMessageId) {
+        this.messages.pop()
+        this.inputValue = this.messages.find(msg => msg.id === this.retryingMessageId).content
+        this.sendMessage()
+      }
+    },
     handleBeforeUnload() {
       this.clearChatHistory()
     },
@@ -299,21 +364,18 @@ export default {
         const html = marked(content)
         console.log('Markdown rendered HTML:', html)
         return html
-
       } catch (e) {
         console.error('Markdown rendering error:', e)
         return content
       }
     },
     handleIncomingMessage(message) {
-      this.isSystemPrompt = true // 标记为系统prompt
-      this.userInput = message
+      this.isSystemPrompt = true
+      this.inputValue = message
       this.sendMessage()
     },
     insertToInput(text) {
-      // 将选中的文本插入到输入框
-      this.userInput = text || '';
-      // 聚焦输入框
+      this.inputValue = text || '';
       this.$nextTick(() => {
         const textarea = document.querySelector('.chat-input .el-textarea__inner');
         if (textarea) {
@@ -323,12 +385,74 @@ export default {
       });
     },
     handleSend() {
-      // 防止空消息
-      if (!this.userInput.trim()) return
+      if (!this.inputValue.trim()) return
       
-      // 发送消息的逻辑
+      // 短暂显示按钮加载状态
+      this.isLoading = true
+      setTimeout(() => {
+        this.isLoading = false
+      }, 300)
+      
       this.sendMessage()
-      this.userInput = '' // 清空输入框
+    },
+    // 添加检查历史记录大小的方法
+    checkHistorySize() {
+      const savedMessages = localStorage.getItem('chatMessages')
+      if (savedMessages) {
+        // 计算大小（以兆字节为单位）
+        const sizeInMB = savedMessages.length / (1024 * 1024)
+        console.log('聊天历史记录大小:', sizeInMB.toFixed(2) + 'MB')
+        
+        // 如果超过1MB，提醒用户
+        if (sizeInMB > 1) {
+          this.$confirm(
+            `聊天历史记录已达到${sizeInMB.toFixed(2)}MB，这可能会影响应用性能。请选择清理方式：`, 
+            '历史记录过大', 
+            {
+              confirmButtonText: '清除全部',
+              cancelButtonText: '暂不处理',
+              distinguishCancelAndClose: true,
+              showClose: true,
+              closeOnClickModal: false,
+              customClass: 'history-size-warning',
+              type: 'warning'
+            }
+          ).then(() => {
+            this.clearChatHistory(false)
+          }).catch(() => {
+            this.$message({
+              type: 'info',
+              message: '您可以随时点击"清除历史"按钮清除记录'
+            })          
+          })
+          
+          // 添加"保留最近"按钮
+          setTimeout(() => {
+            const dialog = document.querySelector('.history-size-warning')
+            if (dialog) {
+              const footer = dialog.querySelector('.el-dialog__footer')
+              if (footer) {
+                // 创建"保留最近"按钮
+                const keepRecentBtn = document.createElement('button')
+                keepRecentBtn.className = 'el-button el-button--primary el-button--small'
+                keepRecentBtn.innerHTML = '仅保留最近对话'
+                keepRecentBtn.style.marginRight = '10px'
+                
+                // 添加点击事件
+                keepRecentBtn.addEventListener('click', () => {
+                  // 关闭对话框
+                  document.querySelector('.history-size-warning .el-dialog__headerbtn').click()
+                  // 执行保留最近的清除
+                  this.clearChatHistory(true)
+                })
+                
+                // 插入按钮
+                footer.insertBefore(keepRecentBtn, footer.firstChild)
+              }
+            }
+          }, 100)
+        }
+      }
     }
   }
 }
@@ -355,8 +479,8 @@ export default {
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 85vh; /* 使用视窗高度的85% */
-  min-height: 500px; /* 设置最小高度 */
+  height: 85vh;
+  min-height: 500px;
   max-height: 100%;
   position: relative;
   background: #fff;
@@ -371,7 +495,7 @@ export default {
   padding: 20px;
   padding-bottom: 160px;
   min-height: 0;
-  height: calc(100% - 140px); /* 减去输入框高度 */
+  height: calc(100% - 140px);
 }
 
 .message {
@@ -381,12 +505,10 @@ export default {
   padding: 0 12px;
 }
 
-/* AI消息靠左 */
 .assistant {
   justify-content: flex-start;
 }
 
-/* 用户消息靠右 */
 .user {
   justify-content: flex-end;
 }
@@ -394,7 +516,7 @@ export default {
 .message-content {
   display: flex;
   align-items: flex-start;
-  gap: 16px; /* 增加头像和气泡的间距 */
+  gap: 16px;
   max-width: 80%;
 }
 
@@ -404,10 +526,10 @@ export default {
 
 .message-avatar {
   display: flex;
-  align-items: flex-start; /* 改为顶部对齐 */
+  align-items: flex-start;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 4px; /* 微调头像位置 */
+  margin-top: 4px;
 }
 
 .assistant .message-avatar :deep(.el-avatar) {
@@ -427,7 +549,7 @@ export default {
   line-height: 1.6;
   font-size: 14px;
   word-break: break-word;
-  min-width: 60px; /* 设置最小宽度 */
+  min-width: 60px;
   max-width: 100%;
 }
 
@@ -459,7 +581,6 @@ export default {
   margin-top: 12px;
 }
 
-/* 滚动条样式 */
 .chat-messages::-webkit-scrollbar {
   width: 6px;
 }
@@ -473,14 +594,13 @@ export default {
   background: transparent;
 }
 
-/* Element UI 组件样式覆盖 */
 .chat-input /deep/ .el-textarea__inner {
   resize: none;
   border-radius: 4px;
   padding: 8px 12px;
   font-size: 14px;
   line-height: 1.5;
-  height: 70px !important; /* 增加输入框高度 */
+  height: 70px !important;
 }
 
 .chat-input /deep/ .el-textarea__inner:focus {
@@ -491,11 +611,10 @@ export default {
   padding: 8px 16px;
 }
 
-/* 响应式布局 */
 @media screen and (max-width: 768px) {
   .chat-container {
     border-radius: 0;
-    height: 80vh; /* 移动端稍微矮一点 */
+    height: 80vh;
     min-height: 400px;
   }
   
@@ -519,22 +638,19 @@ export default {
   }
 }
 
-/* 针对超大屏幕 */
 @media screen and (min-height: 1200px) {
   .chat-container {
-    height: 75vh; /* 在大屏上适当减小比例 */
+    height: 75vh;
   }
 }
 
-/* 针对小屏幕 */
 @media screen and (max-height: 600px) {
   .chat-container {
-    height: 90vh; /* 在小屏上增大比例 */
+    height: 90vh;
     min-height: 300px;
   }
 }
 
-/* 思考中气泡样式 */
 .thinking-bubble {
   display: flex;
   flex-direction: column;
@@ -544,12 +660,11 @@ export default {
   background: linear-gradient(to right, #ecf5ff, #f0f9ff) !important;
   border-left: 3px solid #409EFF;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 16px !important;  /* 确保内边距足够 */
+  padding: 16px !important;
   position: relative;
   overflow: hidden;
 }
 
-/* 添加背景装饰 */
 .thinking-bubble::before {
   content: '';
   position: absolute;
@@ -602,7 +717,6 @@ export default {
   line-height: 1.4;
 }
 
-/* 打字指示器样式 */
 .typing-indicator {
   display: flex;
   align-items: center;
@@ -664,7 +778,6 @@ export default {
   }
 }
 
-/* 思考动画样式 */
 .thinking-animation {
   width: 100%;
   height: 40px;
@@ -730,7 +843,6 @@ export default {
   }
 }
 
-/* 响应式调整 */
 @media screen and (max-width: 768px) {
   .thinking-bubble {
     min-width: 150px;
@@ -749,4 +861,55 @@ export default {
     font-size: 13px;
   }
 }
+
+.stream-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: 8px;
+  height: 16px;
+}
+
+.stream-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #409EFF;
+  opacity: 0.7;
+  animation: pulse 1s infinite ease-in-out alternate;
+}
+
+.stream-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.stream-dot:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.stream-dot:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+/* 错误消息样式 */
+.error-message {
+  background-color: #fef0f0;
+  border-left: 3px solid #f56c6c;
+}
+
+.error-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 添加动画效果 */
+@keyframes pulse {
+  0% { opacity: 0.4; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* 流式响应指示器样式 */
 </style>
