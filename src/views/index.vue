@@ -23,6 +23,7 @@
                  @click="handleFeatureClick(feature.id)"
                  :class="{ clickable: feature.id === 1 || feature.id === 2 || feature.id === 3 || feature.id === 4 }">
               <h3>{{ feature.title }}</h3>
+              <div class="scene-text">{{ feature.scene }}</div>
               <p>{{ feature.description }}</p>
             </div>
             <div class="icon-section">
@@ -55,40 +56,6 @@ export default {
   name: "Index",
   data() {
     return {
-      features: [
-        {
-          id: 1,
-          title: "演讲稿智能写作与评价",
-          description: "依托先进大语言模型技术，为演讲稿写作提供一键评价、整体润色、智能续写、多语翻译等服务",
-          icon: require('@/assets/selfpractice.png'),
-          iconTextEn: "Self Practice",
-          iconTextCn: "自我训练"
-        },
-        {
-          id: 2,
-          title: "演讲视频智能评价",
-          description: "依托多模态学习分析技术，为演讲视频提供演讲者姿态、语音语调和情感表现等方面的智能评价",
-          icon: require('@/assets/客户档案.png'),
-          iconTextEn: "Anxiety Detection",
-          iconTextCn: "焦虑检测"
-        },
-        {
-          id: 3,
-          title: "公众演讲多模态教学与智能评价",
-          description: "全面支撑教师、学生公众演讲的教与学，围绕演讲视频、音频、演讲稿、PPT等多模态数据，提供全面测评报告",
-          icon: require('@/assets/绩效设置汇总.png'),
-          iconTextEn: "Visual Analysis",
-          iconTextCn: "可视化分析"
-        },
-        {
-          id: 4,
-          title: "英语语音智能评价",
-          description: "基于语音识别与分析技术，精准评估发音、语调及流利度，助力提升口语表达能力",
-          icon: require('@/assets/菜单设置.png'),
-          iconTextEn: "Multidimensional Ability",
-          iconTextCn: "多维测试"
-        }
-      ],
       stats: [
         {
           id: 1,
@@ -116,6 +83,69 @@ export default {
           label: "高校高中共建共享"
         },
       ]
+    }
+  },
+  computed: {
+    features() {
+      const roles = this.$store.getters.roles;
+      const isAdmin = roles.includes('admin');
+      
+      const allFeatures = [
+        {
+          id: 1,
+          title: "演讲稿智能写作与评价",
+          description: "依托先进大语言模型技术，为演讲稿写作提供一键评价、整体润色、智能续写、多语翻译等服务",
+          icon: require('@/assets/selfpractice.png'),
+          iconTextEn: "Self Practice",
+          iconTextCn: "自我训练",
+          scene: "自主训练"
+        },
+        {
+          id: 2,
+          title: "演讲视频智能评价",
+          description: "依托多模态学习分析技术，为演讲视频提供演讲者姿态、语音语调和情感表现等方面的智能评价",
+          icon: require('@/assets/客户档案.png'),
+          iconTextEn: "Anxiety Detection",
+          iconTextCn: "焦虑检测",
+          scene: "自主训练"
+        },
+        {
+          id: 3,
+          title: "公众演讲多模态教学与智能评价",
+          description: "全面支撑教师、学生公众演讲的教与学，围绕演讲视频、音频、演讲稿、PPT等多模态数据，提供全面测评报告",
+          icon: require('@/assets/绩效设置汇总.png'),
+          iconTextEn: "Visual Analysis",
+          iconTextCn: "可视化分析",
+          scene: "教学场景"
+        },
+        {
+          id: 4,
+          title: "英语语音智能评价",
+          description: "基于语音识别与分析技术，精准评估发音、语调及流利度，助力提升口语表达能力",
+          icon: require('@/assets/菜单设置.png'),
+          iconTextEn: "Multidimensional Ability",
+          iconTextCn: "多维测试",
+          scene: "自主训练"
+        }
+      ];
+
+      if (isAdmin) {
+        // 教师/管理员顺序
+        return [
+          allFeatures[2], // 公众演讲多模态教学与智能评价
+          allFeatures[0], // 演讲稿智能写作与评价
+          allFeatures[1], // 演讲视频智能评价
+          allFeatures[3]  // 英语语音智能评价
+        ];
+      } else {
+        // 学生顺序
+        return [
+          allFeatures[0], // 演讲稿智能写作与评价
+          allFeatures[1], // 演讲视频智能评价
+          allFeatures[3], // 英语语音智能评价
+          allFeatures[2]  // 公众演讲多模态教学与智能评价
+        ];
+      }
     }
   },
   methods: {
@@ -431,6 +461,15 @@ export default {
     margin-bottom: 0.7rem;
     font-size: 1.5rem;
     font-weight: 600;
+  }
+
+  .scene-text {
+    text-align: center;
+    width: 100%;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+    font-weight: 500;
   }
 
   p {

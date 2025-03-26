@@ -75,7 +75,7 @@
         <!-- 右侧 MediaPipe 处理结果区域 -->
         <div class="videoView">
           <div class="control-panel">
-            <span class="processing-status">MediaPipe 处理结果 <small>(需手动点击启动)</small></span>
+            <span class="processing-status">人体骨骼分析 <small>(需手动点击启动)</small></span>
             <div class="mediapipe-controls">
               <button 
                 class="custom-button mediapipe-button"
@@ -110,7 +110,7 @@
         <!-- 左侧第三个卡片 - 焦虑分析结果 -->
         <div class="videoView">
           <div class="control-panel">
-            <span class="processing-status">焦虑分析结果</span>
+            <span class="processing-status">演讲焦虑分析结果</span>
             <div class="anxiety-controls">
               <button 
                 class="custom-button analyze-button"
@@ -120,7 +120,7 @@
                 <span class="button-icon">
                   <i class="fas fa-brain"></i>
                 </span>
-                <span class="button-text">分析焦虑</span>
+                <span class="button-text">点击分析焦虑</span>
               </button>
             </div>
             <div class="analysis-status" v-if="isAnalyzing">

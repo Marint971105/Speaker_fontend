@@ -57,11 +57,13 @@
 
     <!-- 分页控件 -->
     <el-pagination
-      @current-change="changePage"
-      :current-page="currentPage"
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+      :current-page.sync="currentPage"
+      :page-sizes="[10, 20, 30, 50]"
       :page-size="pageSize"
-      :total="members.length"
-      layout="total, prev, pager, next, jumper"
+      :total="total"
+      layout="total, sizes, prev, pager, next, jumper"
       style="margin-top: 20px; text-align: right;"
     >
     </el-pagination>
@@ -83,10 +85,19 @@ export default {
       filteredMembers: [],  // 存储过滤后的成员数据
       currentPage: 1,
       pageSize: 10,
-      total: 0 // 总条数
+      total: 0 // 这个值会被设置为后端返回的total
     }
   },
   methods: {
+    // 修改分页处理方法
+    handleSizeChange(val) {
+      this.pageSize = val;
+      this.fetchMembers();
+    },
+    handleCurrentChange(val) {
+      this.currentPage = val;
+      this.fetchMembers();
+    },
     async fetchMembers() {
       const params = {
         page: this.currentPage,
@@ -94,23 +105,21 @@ export default {
         stuIndex: this.searchQuery.stuIndex,  // 模糊查询条件
         name: this.searchQuery.name,
         mail: this.searchQuery.mail
-      };try {
+      };
+      try {
         const response = await getMembers(params);
         if (response.code === 1) {
           this.members = response.data.rows;
-          this.total = response.data.total; // 更新总条数
+          this.total = response.data.total; // 使用后端返回的total值
         }
       } catch (error) {
         console.error("获取成员数据失败:", error);
+        this.$message.error('获取成员数据失败');
       }
     },
     searchMembers() {
-      this.currentPage = 1; // 重置分页到第一页
-      this.fetchMembers(); // 执行查询
-    },
-    changePage(page) {
-      this.currentPage = page;
-      this.fetchMembers(); // 获取新页面数据
+      this.currentPage = 1; // 搜索时重置到第一页
+      this.fetchMembers();
     },
     // 1. 新增 confirmDelete 方法
     async confirmDelete(userId) {
@@ -143,7 +152,7 @@ export default {
           });
         }
       }).catch(() => {
-        // 用户点击“取消”时会触发这里
+        // 用户点击"取消"时会触发这里
         this.$message({
           type: 'info',
           message: '已取消删除'
@@ -177,9 +186,9 @@ export default {
     editMember(userId) {
       this.$router.push({ path: '/memberManage/userDetail', query: { userId } });
     }
-    },
+  },
   created() {
-    this.fetchMembers(); // 页面加载时获取数据
+    this.fetchMembers(); // 初始化数据
   }
 }
 

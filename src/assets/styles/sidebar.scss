@@ -18,7 +18,7 @@
     background-color: $base-menu-background;
     height: 100%;
     position: fixed;
-    font-size: 0px;
+    font-size: $base-menu-item-font-size;
     top: 0;
     bottom: 0;
     left: 0;
@@ -61,7 +61,8 @@
     }
 
     .svg-icon {
-      margin-right: 16px;
+      margin-right: $base-menu-item-icon-margin;
+      font-size: $base-menu-item-icon-size;
     }
 
     .el-menu {
@@ -77,6 +78,10 @@
       white-space: nowrap !important;
       color: $base-menu-color !important;
       background-color: $base-menu-background !important;
+      height: $base-menu-item-height !important;
+      line-height: $base-menu-item-height !important;
+      font-size: $base-menu-item-font-size !important;
+      padding: $base-menu-item-padding !important;
     }
 
     // menu hover

@@ -4,37 +4,47 @@
       <!-- 卡片1: 音频脚本 -->
       <el-card class="box-card script-card">
         <div slot="header" class="clearfix">
-          <span class="card-title">音频脚本</span>
+          <span class="card-title">语音训练</span>
         </div>
         <div class="content">
           <div class="script-tabs">
             <el-tabs v-model="activeScriptTab">
-              <el-tab-pane label="预设脚本" name="preset">
-                <div class="preset-scripts">
-                  <div v-for="script in presetScripts" :key="script.id" class="script-item">
-                    <el-button 
-                      :type="selectedScriptId === script.id ? 'primary' : 'text'"
-                      class="script-select-button"
-                      @click="selectScript(script.id)">
-                      {{ script.title }}
-                    </el-button>
+              <el-tab-pane label="练习题库" name="preset">
+                <div class="preset-scripts-container">
+                  <!-- 左侧主题按钮列表 -->
+                  <div class="preset-scripts-menu">
+                    <div v-for="script in presetScripts" :key="script.id" class="script-item">
+                      <el-button 
+                        :type="selectedScriptId === script.id ? 'primary' : 'text'"
+                        class="script-select-button"
+                        @click="selectScript(script.id)">
+                        {{ script.title }}
+                      </el-button>
+                    </div>
+                  </div>
+                  
+                  <!-- 右侧内容展示区 -->
+                  <div class="script-content-area">
+                    <div v-if="selectedScript" class="script-content">
+                      <p>{{ selectedScript.content }}</p>
+                    </div>
+                    <div v-else class="no-content-selected">
+                      <p>请选择一个主题进行练习</p>
+                    </div>
                   </div>
                 </div>
-                <div v-if="selectedScript" class="script-content">
-                  <h4>{{ selectedScript.title }}</h4>
-                  <p>{{ selectedScript.content }}</p>
-                </div>
+                
                 <!-- 预设脚本的按钮固定在右下角 -->
                 <div class="preset-script-fixed-action">
-                  <el-button size="small" type="primary" @click="submitPresetScript" :disabled="!selectedScript">提交脚本</el-button>
+                  <el-button size="small" type="primary" @click="submitPresetScript" :disabled="!selectedScript">上传口语练习内容</el-button>
                 </div>
               </el-tab-pane>
-              <el-tab-pane label="自定义脚本" name="custom">
+              <el-tab-pane label="自定义练习" name="custom">
                 <div class="custom-script">
                   <el-input
                     type="textarea"
                     :rows="6"
-                    placeholder="请输入您的自定义脚本内容..."
+                    placeholder="请输入您的个性化口语练习内容..."
                     v-model="customScriptContent"
                     @input="checkWordCount">
                   </el-input>
@@ -42,7 +52,7 @@
                     已输入 {{ wordCount }} 个单词，最多允许 1000 个单词
                   </div>
                   <div class="script-actions">
-                    <el-button size="small" type="primary" @click="submitCustomScript" :disabled="!customScriptContent.trim() || isWordCountExceeded">提交脚本</el-button>
+                    <el-button size="small" type="primary" @click="submitCustomScript" :disabled="!customScriptContent.trim() || isWordCountExceeded">上传口语练习内容</el-button>
                     <el-button size="small" @click="clearCustomScript" :disabled="!customScriptContent.trim()">清空</el-button>
                   </div>
                 </div>
@@ -55,7 +65,7 @@
       <!-- 卡片2: 音频上传 -->
       <el-card class="box-card upload-card">
         <div slot="header" class="clearfix">
-          <span class="card-title">音频上传</span>
+          <span class="card-title">语音上传</span>
         </div>
         <div class="content">
           <div class="upload-section">
@@ -67,7 +77,7 @@
               :show-file-list="false"
               accept=".wav,.pcm">
               <i class="el-icon-plus avatar-uploader-icon"></i>
-              <div class="upload-text">点击上传音频文件</div>
+              <div class="upload-text">点击上传您的口语练习音频</div>
               <div class="upload-tip">仅支持未压缩的PCM或WAV格式音频</div>
             </el-upload>
             
@@ -82,7 +92,7 @@
           
           <div class="controls">
             <el-button type="primary" @click="startAssessment" :disabled="!audioUrl">
-              开始评估
+              点击评估您的口语
             </el-button>
             <el-button @click="resetAudio" :disabled="!audioUrl">重置</el-button>
           </div>
@@ -1717,7 +1727,7 @@ export default {
 }
 
 .card-container {
-  max-width: 1600px;
+  max-width: 1800px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -2294,7 +2304,7 @@ export default {
 
 /* 确保tab内容区域高度一致 */
 .el-tabs__content {
-  height: 310px;
+  height: 330px;
   overflow: hidden; /* 改为hidden，让内部元素控制滚动 */
 }
 
@@ -2373,8 +2383,8 @@ export default {
 /* 预设脚本的按钮固定在右下角 */
 .preset-script-fixed-action {
   position: absolute;
-  bottom: 1px;
-  right: 15px;
+  bottom: 5px;
+  right: 20px;
   z-index: 10;
 }
 
@@ -2456,6 +2466,59 @@ export default {
   color: #606266;
   line-height: 1.5;
   font-size: 14px;
+}
+
+/* 主题训练左右布局样式 */
+.preset-scripts-container {
+  display: flex;
+  margin-bottom: 40px; /* 为固定按钮留出空间 */
+  height: 250px;
+}
+
+.preset-scripts-menu {
+  width: 30%;
+  border-right: 1px solid #dcdfe6;
+  padding-right: 15px;
+  overflow-y: auto;
+}
+
+.script-content-area {
+  width: 70%;
+  padding-left: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-item {
+  margin-bottom: 10px;
+}
+
+.script-select-button {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+}
+
+.script-content {
+  flex: 1;
+  padding: 15px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  overflow-y: auto;
+  height: auto;
+  margin-bottom: 0;
+}
+
+.no-content-selected {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #909399;
+  font-style: italic;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
 }
 </style>
 
