@@ -92,7 +92,38 @@ export const constantRoutes = [
     path: '/cas/callback',
     component: () => import('@/views/cas/callback'),
     hidden: true
-  }
+  },
+  // {
+  //   path: '/video',
+  //   component: Layout,
+  //   name: 'Video',
+  //   meta: { 
+  //     title: '视频分析', 
+  //     icon: 'tool',
+  //     roles: ['admin'],
+  //     permissions: ['system:test:view']
+  //   },
+  //   children: [
+  //     {
+  //       path: 'record',
+  //       component: () => import('@/views/test/index'),
+  //       name: 'VideoRecord',
+  //       meta: { 
+  //         title: '录制视频', 
+  //         icon: 'video' 
+  //       }
+  //     },
+  //     {
+  //       path: 'analysis',
+  //       component: () => import('@/views/test/AIAnalysisTest'),
+  //       name: 'AIAnalysis',
+  //       meta: { 
+  //         title: 'AI分析', 
+  //         icon: 'brain' 
+  //       }
+  //     }
+  //   ]
+  // }
 ]
 
 // 动态路由，基于用户权限动态去加载
@@ -226,7 +257,7 @@ export const dynamicRoutes = [
     path: '/homeworkManage/',
     component: Layout,
     hidden: false,
-    meta: { roles: ['admin'], permissions: ['system:user:edit'], icon: 'druid' },
+    meta: { roles: ['admin'], permissions: ['system:user:edit'], icon: 'form' },
     children: [
       {
         path: 'index/',
@@ -262,7 +293,7 @@ export const dynamicRoutes = [
     path: '/classManage/',
     component: Layout,
     hidden: false,
-    meta: { title: '班级管理', icon: 'user' },
+    meta: { title: '班级管理', icon: 'peoples' },
     children: [
       {
         path: 'teacher/index/',
@@ -295,14 +326,14 @@ export const dynamicRoutes = [
     path: '/myTask/',
     component: Layout,
     hidden: false,
-    meta: { title: '我的任务', icon: 'user' },
+    meta: { title: '我的任务', icon: 'job' },
     children: [
       {
         path: 'myEvaluation/index/',
         component: () => import('@/views/myTask/myEvaluation/index.vue'),
         name: 'myEvaluation/index/',
         hidden: false,
-        meta: { title: '我的评价', roles: ['common'], activeMenu: '/myTask/' },
+        meta: { title: '我的评价', roles: ['common'], activeMenu: '/myTask/', icon: 'rate' },
       },
       {
         path: '/myEvaluation/selfReview',
@@ -406,25 +437,25 @@ export const dynamicRoutes = [
     path: '/homeworkTrial/',
     component: Layout,
     hidden: false,
-    meta: { title: '特色功能', icon: 'user' },
+    meta: { title: '特色功能', icon: 'star' },
     children: [
       {
         path: 'video/index',
         name: 'homeworkTrial_video',
-        component: () => import('@/views/homeworkTrial/video/index.vue'),
-        meta: { title: '演讲视频智能评价', roles: ['common'], icon: 'tab' }
+        component: () => import('@/views/test/AIAnalysisTest.vue'),
+        meta: { title: '演讲视频智能评价', roles: ['common'], icon: 'monitor' }
       },
       {
         path: 'audio/index',
         name: 'homeworkTrial_audio',
         component: () => import('@/views/homeworkTrial/audio/index.vue'),
-        meta: { title: '英语语音智能评价', roles: ['common'], icon: 'tab' }
+        meta: { title: '英语语音智能评价', roles: ['common'], icon: 'phone' }
       },
       {
         path: 'chat/index',
         name: 'homeworkTrial_chat',
         component: () => import('@/views/chat/index'),
-        meta: { title: '演讲稿智能写作', roles: ['common'], icon: 'message' }
+        meta: { title: '演讲稿智能写作', roles: ['common'], icon: 'edit' }
       }
     ]
   },

@@ -2,7 +2,8 @@ import axios from 'axios'
 
 // 创建独立的 axios 实例
 const chatService = axios.create({
-  baseURL: 'http://10.120.48.67:8001',
+  // baseURL: 'http://10.120.48.67:8001',
+  baseURL: process.env.NODE_ENV === 'production' ? '/api/ai' : 'http://10.120.48.67:81/api/ai',
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json'

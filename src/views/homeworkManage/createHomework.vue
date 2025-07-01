@@ -94,7 +94,7 @@
         <el-row>
           <el-col :span="24">
             <el-form-item label="分数设置:" required>
-              <el-table :data="scoreItems" style="width: 100%">
+              <el-table :data="filteredScoreItems" style="width: 100%">
                 <el-table-column prop="category" label="类别" width="125" align="center" ></el-table-column>
                 <el-table-column label="满分" width="120" align="center">100</el-table-column>
                 <el-table-column label="权重" width="125" align="center">
@@ -109,7 +109,15 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <div v-if="weightSum !== 100" class="weight-warning">权重相加需为100%</div>
+              <div v-if="assignment.contentTypes.length === 0" class="weight-warning">
+                请先选择提交内容类型
+              </div>
+              <div v-else-if="currentWeightSum !== 100" class="weight-warning">
+                权重相加需为100%（当前：{{ currentWeightSum }}%）
+              </div>
+              <div v-else class="weight-success">
+                ✓ 权重分配正确（{{ filteredScoreItems.length }}个评分项）
+              </div>
               <div>总分：{{ totalScore }}</div>
             </el-form-item>
           </el-col>
@@ -176,6 +184,12 @@ export default {
     console.log('Owner ID:', this.userId);
     // 可以在这里使用这些值做初始化工作
   },
+  mounted() {
+    // 初始化时重新分配权重，确保权重分配与选中的内容类型一致
+    this.$nextTick(() => {
+      this.redistributeWeights();
+    });
+  },
   computed: {
     ...mapGetters(['name', 'userId']) , // 获取 ownerName 和 ownerId，假设 getter 名称分别为 'name' 和 'userId'
     descriptionLength() {
@@ -184,7 +198,16 @@ export default {
     reviewProcessDescription() {
       return this.reviewProcesses.join('-');
     },
-
+    // 根据选择的提交内容类型过滤分数设置项
+    filteredScoreItems() {
+      return this.scoreItems.filter(item => 
+        this.assignment.contentTypes.includes(item.category)
+      );
+    },
+    // 计算当前选中项目的权重总和
+    currentWeightSum() {
+      return this.filteredScoreItems.reduce((sum, item) => sum + item.weight, 0);
+    }
   },
 
   methods: {
@@ -219,8 +242,15 @@ export default {
         return false;
       }
 
-      if (!this.scoreItems.every(item => item.weight > 0)) {
+      // 验证选中的评分项权重
+      if (!this.filteredScoreItems.every(item => item.weight > 0)) {
         this.$message.error('请为所有评分项设置权重');
+        return false;
+      }
+      
+      // 验证权重总和是否为100%
+      if (this.currentWeightSum !== 100) {
+        this.$message.error('权重总和必须为100%');
         return false;
       }
 
@@ -243,7 +273,10 @@ export default {
         reviewSettings: this.hiddenInformation,
         ownerName: this.name,  // 使用 Vuex getter 获取 ownerName
         ownerId: this.userId,  // 使用 Vuex getter 获取 ownerId
-        weights: this.scoreItems.map(item => item.weight)
+        weights: this.filteredScoreItems.map(item => ({
+          category: item.category,
+          weight: item.weight
+        }))
       };
 
       // 构建 FormData 并将 JSON 和文件一起上传
@@ -327,9 +360,11 @@ export default {
       }
     },
     calculateScores() {
-      this.weightSum = this.scoreItems.reduce((sum, item) => sum + item.weight, 0);
-      // 直接用100乘以权重百分比
-      this.totalScore = this.scoreItems.reduce((sum, item) => {
+      // 只计算选中的提交内容类型的权重
+      this.weightSum = this.currentWeightSum;
+      
+      // 基于过滤后的项目计算总分
+      this.totalScore = this.filteredScoreItems.reduce((sum, item) => {
         return sum + (100 * item.weight / 100);
       }, 0).toFixed(2);
 
@@ -337,8 +372,72 @@ export default {
         this.$message.warning('权重相加需为100%');
       }
     },
+    
+    // 当提交内容类型发生变化时，重新分配权重
+    redistributeWeights() {
+      const selectedCount = this.assignment.contentTypes.length;
+      if (selectedCount === 0) {
+        // 如果没有选择内容类型，重置所有权重为0
+        this.scoreItems.forEach(item => {
+          item.weight = 0;
+        });
+        this.calculateScores();
+        return;
+      }
+      
+      // 平均分配权重，确保总和为100%
+      const averageWeight = Math.floor(100 / selectedCount);
+      const remainder = 100 - (averageWeight * selectedCount);
+      
+      // 重置所有权重为0
+      this.scoreItems.forEach(item => {
+        item.weight = 0;
+      });
+      
+      // 为选中的类型分配权重
+      let assignedRemainder = 0;
+      this.assignment.contentTypes.forEach((contentType, index) => {
+        const scoreItem = this.scoreItems.find(item => item.category === contentType);
+        if (scoreItem) {
+          scoreItem.weight = averageWeight;
+          // 将余数分配给前几个项目
+          if (assignedRemainder < remainder) {
+            scoreItem.weight += 1;
+            assignedRemainder++;
+          }
+        } else {
+          console.warn(`未找到类别 "${contentType}" 对应的评分项`);
+        }
+      });
+      
+      // 重新计算分数
+      this.calculateScores();
+      
+      // 提供用户友好的反馈
+      if (selectedCount > 1) {
+        this.$message({
+          message: `已为${selectedCount}个评分项自动分配权重`,
+          type: 'success',
+          duration: 2000
+        });
+      }
+      
+      console.log('权重重新分配完成:', {
+        selectedTypes: this.assignment.contentTypes,
+        weights: this.filteredScoreItems.map(item => ({
+          category: item.category,
+          weight: item.weight
+        })),
+        totalWeight: this.currentWeightSum
+      });
+    },
     updateTaskJson() {
-      // 更新 taskJson 数据
+      // 更新 taskJson 数据，只包含选中的内容类型及其权重
+      const selectedWeights = this.filteredScoreItems.map(item => ({
+        category: item.category,
+        weight: item.weight
+      }));
+      
       this.taskJson = {
         submissionTypes: this.assignment.contentTypes,
         taskName: this.assignment.name,
@@ -348,7 +447,7 @@ export default {
         reviewSettings: this.hiddenInformation,
         ownerName: this.name,
         ownerId: this.userId,
-        weights: this.scoreItems.map(item => item.weight)
+        weights: selectedWeights
       };
 
       // 打印到控制台
@@ -360,13 +459,31 @@ export default {
     // },
   },
   watch: {
+    // 监听提交内容类型的变化
+    'assignment.contentTypes': {
+      handler(newContentTypes, oldContentTypes) {
+        console.log('提交内容类型发生变化:', {
+          old: oldContentTypes,
+          new: newContentTypes
+        });
+        
+        // 如果选择的内容类型发生变化，重新分配权重
+        if (newContentTypes && newContentTypes.length > 0) {
+          // 使用nextTick确保DOM更新后再重新分配权重
+          this.$nextTick(() => {
+            this.redistributeWeights();
+          });
+        }
+        
+        this.updateTaskJson();
+      },
+      deep: true,
+      immediate: false
+    },
     weightSum(newSum) {
       if (newSum !== 100) {
         this.$message.warning('权重相加需为100%');
       }
-    },
-    mounted() {
-      this.calculateScores(); // 初始化时计算一次
     },
     assignment: {
       deep: true,
@@ -413,6 +530,11 @@ export default {
 }
 .weight-warning {
    color: red;
+   margin-top: 10px;
+ }
+
+.weight-success {
+   color: green;
    margin-top: 10px;
  }
 

@@ -10,7 +10,6 @@
                 :unique-opened="true"
                 :active-text-color="settings.theme"
                 :collapse-transition="false"
-                active-text-color="#ffffff"
                 mode="vertical"
             >
                 <sidebar-item
@@ -61,6 +60,8 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+@import "@/assets/styles/variables.scss";
+
 // 给最外层div添加样式
 div {
   margin: 0px;  // 给圆角留出空间
@@ -90,14 +91,16 @@ div {
 ::v-deep .el-menu {
   border-right: none;
 
-  // 确保选中状态的文字颜色
+  // 选中状态的样式
   .el-menu-item.is-active {
-    color: #ffffff !important;
+    background-color: #f6f6f6;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   }
 
-  // 子菜单选中状态的文字颜色
+  // 子菜单选中状态的样式
   .el-submenu .el-menu-item.is-active {
-    color: #ffffff !important;
+    background-color: #f6f6f6;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   }
 }
 </style>

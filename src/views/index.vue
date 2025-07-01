@@ -48,6 +48,22 @@
         </div>
       </div>
     </section>
+    
+    <!-- 可选：聊天助手区域 -->
+    <!-- 如果您想要在页面中显示聊天区域而不是浮动按钮，可以取消下面的注释 -->
+    <!--
+    <section class="chat-section container" v-if="showChatSection">
+      <div class="chat-container">
+        <h2>智能助手</h2>
+        <iframe 
+          src="https://llm.bupt.edu.cn/chatbot/f0G1AJ1iaJ4L2NSl"
+          class="chat-iframe"
+          frameborder="0"
+          allow="microphone">
+        </iframe>
+      </div>
+    </section>
+    -->
   </div>
 </template>
 
@@ -571,5 +587,32 @@ export default {
   margin: 0 auto;
   padding: 0 1rem; // 减小padding
   width: 100%;
+}
+
+/* 聊天区域样式 - 如果启用iframe方式 */
+.chat-section {
+  padding: 2rem 0;
+  background: rgba(17, 34, 64, 0.8);
+  border-radius: 10px;
+  margin: 1rem 0;
+}
+
+.chat-container {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.chat-container h2 {
+  color: #ffffff;
+  margin-bottom: 1rem;
+  font-size: 2rem;
+}
+
+.chat-iframe {
+  width: 100%;
+  height: 600px;
+  border-radius: 10px;
+  background: white;
 }
 </style>

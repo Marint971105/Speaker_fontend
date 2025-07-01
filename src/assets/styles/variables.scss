@@ -52,16 +52,16 @@ $base-sub-menu-hover:#001528;
 */
 
 // 侧边栏尺寸
-$base-sidebar-width: 280px;                  // 增加侧边栏宽度
-$base-hide-sidebar-width: 64px;              // 折叠时的宽度
+$base-sidebar-width: 230px;                  // 增加侧边栏宽度
+$base-hide-sidebar-width: 55px;              // 折叠时的宽度
 $base-sidebar-logo-height: 50px;             // logo高度
 $base-sidebar-logo-height-expand: 50px;      // logo展开高度
 
 // 菜单项样式
 $base-menu-item-height: 56px;                // 菜单项高度
-$base-menu-item-font-size: 16px;             // 菜单项字体大小
+$base-menu-item-font-size: 15px;             // 菜单项字体大小
 $base-menu-item-padding: 0 20px;             // 菜单项内边距
-$base-menu-item-icon-size: 20px;             // 图标大小
+$base-menu-item-icon-size: 18px;             // 图标大小
 $base-menu-item-icon-margin: 24px;           // 图标边距
 
 // the :export directive is the magic sauce for webpack
