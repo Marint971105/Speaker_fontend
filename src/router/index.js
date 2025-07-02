@@ -442,8 +442,15 @@ export const dynamicRoutes = [
       {
         path: 'video/index',
         name: 'homeworkTrial_video',
-        component: () => import('@/views/test/AIAnalysisTest.vue'),
+        component: () => import('@/views/test/index.vue'),
         meta: { title: '演讲视频智能评价', roles: ['common'], icon: 'monitor' }
+      },
+      {
+        path: 'video/analysis',
+        name: 'homeworkTrial_video_analysis',
+        component: () => import('@/views/test/AIAnalysisTest.vue'),
+        hidden: true,
+        meta: { title: 'AI分析', roles: ['common'], icon: 'monitor', activeMenu: '/homeworkTrial/video/index' }
       },
       {
         path: 'audio/index',

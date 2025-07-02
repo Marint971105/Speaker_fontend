@@ -215,7 +215,7 @@ export default {
   },
   methods: {
     goToAnalysis() {
-      this.$router.push('/video/analysis')
+      this.$router.push('/homeworkTrial/video/analysis')
     },
     checkRecordings() {
       // 简单检查localStorage中是否有录制记录

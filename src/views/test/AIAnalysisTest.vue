@@ -365,7 +365,7 @@ export default {
     },
     
     goToRecord() {
-      this.$router.push('/video/record')
+      this.$router.push('/homeworkTrial/video/index')
     },
     
     onVideoLoaded() {
