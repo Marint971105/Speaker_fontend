@@ -72,12 +72,27 @@ export default {
     }
   },
   data() {
+    console.log('🔍 [DEBUG] AnxietyAnalysis data() 开始初始化')
+    console.log('🔍 [DEBUG] 当前环境:', process.env.NODE_ENV)
+    console.log('🔍 [DEBUG] 所有环境变量:', {
+      NODE_ENV: process.env.NODE_ENV,
+      VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
+      BASE_URL: process.env.BASE_URL,
+      VUE_APP_BASE_URL: process.env.VUE_APP_BASE_URL
+    })
+    
+    const apiBaseUrl = process.env.VUE_APP_ANALYSIS_API || '/analysis-api'
+    console.log('🔍 [DEBUG] AnxietyAnalysis 计算得到的 apiBaseUrl:', apiBaseUrl)
+    console.log('🔍 [DEBUG] AnxietyAnalysis apiBaseUrl 类型:', typeof apiBaseUrl)
+    console.log('🔍 [DEBUG] AnxietyAnalysis 当前页面 URL:', window.location.href)
+    
     return {
       isAnalyzing: false,
       analysisProgress: 0,
       anxietyResult: null,
       analysisTime: '',
-      apiBaseUrl: 'http://10.120.48.67:8000'
+      // apiBaseUrl: 'http://10.120.48.67:8000'
+      apiBaseUrl: apiBaseUrl
     }
   },
   computed: {
@@ -177,6 +192,13 @@ export default {
     }
   },
   mounted() {
+    console.log('🔍 [DEBUG] AnxietyAnalysis mounted() 开始')
+    console.log('🔍 [DEBUG] AnxietyAnalysis mounted() 时的 apiBaseUrl:', this.apiBaseUrl)
+    console.log('🔍 [DEBUG] AnxietyAnalysis mounted() 时的环境变量:', {
+      VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
+      NODE_ENV: process.env.NODE_ENV
+    })
+    console.log('🔍 [DEBUG] AnxietyAnalysis mounted() 时的当前页面:', window.location.href)
     if (this.autoStart) {
       this.startAnalysis()
     }
@@ -190,6 +212,17 @@ export default {
   },
   methods: {
     async startAnalysis() {
+      console.log('🔍 [DEBUG] AnxietyAnalysis startAnalysis() 开始')
+      console.log('🔍 [DEBUG] AnxietyAnalysis startAnalysis() 时的 apiBaseUrl:', this.apiBaseUrl)
+      console.log('🔍 [DEBUG] AnxietyAnalysis startAnalysis() 时的环境变量:', {
+        VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
+        NODE_ENV: process.env.NODE_ENV
+      })
+      console.log('🔍 [DEBUG] AnxietyAnalysis startAnalysis() 时的参数:', {
+        videoUrl: this.videoUrl,
+        isAnalyzing: this.isAnalyzing
+      })
+      
       if (!this.videoUrl || this.isAnalyzing) return
       
       this.isAnalyzing = true
@@ -211,8 +244,14 @@ export default {
         }
         
         // 上传视频
+        console.log('🔍 [DEBUG] AnxietyAnalysis 构建上传URL前的 apiBaseUrl:', this.apiBaseUrl)
+        const uploadUrl = `${this.apiBaseUrl}/upload`
+        console.log('🔍 [DEBUG] AnxietyAnalysis 构建的上传URL:', uploadUrl)
+        console.log('🔍 [DEBUG] AnxietyAnalysis 上传URL是否包含IP:', uploadUrl.includes('10.120.48.67'))
+        console.log('🔍 [DEBUG] AnxietyAnalysis 上传URL是否包含analysis-api:', uploadUrl.includes('analysis-api'))
+        
         const uploadResponse = await axios.post(
-          `${this.apiBaseUrl}/upload`, 
+          uploadUrl, 
           videoFileForAPI,
           {
             headers: {

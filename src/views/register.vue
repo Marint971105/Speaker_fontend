@@ -364,7 +364,7 @@ export default {
   justify-content: center;
   align-items: center;
   height: 100%;
-  background-image: url("../assets/images/registerbackground2.jpg");
+  background-image: url("../assets/background.png");
   background-size: cover;
 }
 .register-container {

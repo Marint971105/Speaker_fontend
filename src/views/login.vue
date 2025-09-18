@@ -186,9 +186,9 @@ export default {
       }
       
       // 使用与后端完全相同的 service URL
-      const serviceUrl = rfc2396Encode('http://123.56.183.160:8081/cas/callback')
+      const serviceUrl = rfc2396Encode('https://123.56.183.160:8081/cas/callback')
       
-      console.log('编码前service:', 'http://123.56.183.160:8081/cas/callback')
+      console.log('编码前service:', 'https://123.56.183.160:8081/cas/callback')
       console.log('编码后service:', serviceUrl)
       window.location.href = `${casLoginUrl}?service=${serviceUrl}`
     }

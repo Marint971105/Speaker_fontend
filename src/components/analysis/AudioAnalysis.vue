@@ -499,7 +499,7 @@ export default {
 .frequency-bars {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-end;
   height: 100px;
   background: #f8f9fa;
   padding: 15px;

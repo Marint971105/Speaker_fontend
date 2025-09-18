@@ -364,6 +364,22 @@ export default {
   },
   
   data() {
+    console.log('🔍 [DEBUG] HolisticDetection data() 开始初始化')
+    console.log('🔍 [DEBUG] 当前环境:', process.env.NODE_ENV)
+    console.log('🔍 [DEBUG] 所有环境变量:', {
+      NODE_ENV: process.env.NODE_ENV,
+      VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
+      BASE_URL: process.env.BASE_URL,
+      VUE_APP_BASE_URL: process.env.VUE_APP_BASE_URL
+    })
+    
+    const apiBaseUrl = process.env.VUE_APP_ANALYSIS_API || '/analysis-api'
+    console.log('🔍 [DEBUG] 计算得到的 apiBaseUrl:', apiBaseUrl)
+    console.log('🔍 [DEBUG] apiBaseUrl 类型:', typeof apiBaseUrl)
+    console.log('🔍 [DEBUG] 当前页面 URL:', window.location.href)
+    console.log('🔍 [DEBUG] 当前页面协议:', window.location.protocol)
+    console.log('🔍 [DEBUG] 当前页面主机:', window.location.host)
+    
     return {
       // MediaPipe 相关
       holistic: null,
@@ -401,8 +417,8 @@ export default {
       analysisProgress: 0,
       anxietyResult: null,
       analysisTime: '',
-      apiBaseUrl: 'http://10.120.48.67:8000',
-      
+      // apiBaseUrl: 'http://10.120.48.67:8000',
+      apiBaseUrl: apiBaseUrl,
       // 音频分析
       audioContext: null,
       audioSource: null,
@@ -551,6 +567,13 @@ export default {
   },
   
   async mounted() {
+    console.log('🔍 [DEBUG] HolisticDetection mounted() 开始')
+    console.log('🔍 [DEBUG] mounted() 时的 apiBaseUrl:', this.apiBaseUrl)
+    console.log('🔍 [DEBUG] mounted() 时的环境变量:', {
+      VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
+      NODE_ENV: process.env.NODE_ENV
+    })
+    
     try {
       // 并行初始化 MediaPipe 和 FFmpeg
       await Promise.all([
@@ -1881,6 +1904,19 @@ export default {
     
     // 焦虑分析 (保持原有逻辑)
     async analyzeAnxiety() {
+      console.log('🔍 [DEBUG] analyzeAnxiety() 开始')
+      console.log('🔍 [DEBUG] analyzeAnxiety() 时的 apiBaseUrl:', this.apiBaseUrl)
+      console.log('🔍 [DEBUG] analyzeAnxiety() 时的环境变量:', {
+        VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
+        NODE_ENV: process.env.NODE_ENV
+      })
+      console.log('🔍 [DEBUG] analyzeAnxiety() 时的 this 对象:', {
+        apiBaseUrl: this.apiBaseUrl,
+        recordingConfirmed: this.recordingConfirmed,
+        isAnalyzing: this.isAnalyzing
+      })
+      
+      // 应该输出 '/analysis-api/upload'
       if (!this.recordingConfirmed || this.isAnalyzing) return
       
       this.isAnalyzing = true
@@ -1902,8 +1938,22 @@ export default {
         }
         
         // 上传视频
+        console.log('🔍 [DEBUG] 构建上传URL前的 apiBaseUrl:', this.apiBaseUrl)
+        const uploadUrl = `${this.apiBaseUrl}/upload`
+        console.log('🔍 [DEBUG] 构建的上传URL:', uploadUrl)
+        console.log('🔍 [DEBUG] 上传URL是否包含IP:', uploadUrl.includes('10.120.48.67'))
+        console.log('🔍 [DEBUG] 上传URL是否包含analysis-api:', uploadUrl.includes('analysis-api'))
+        console.log('🔍 [DEBUG] 完整的请求配置:', {
+          url: uploadUrl,
+          method: 'POST',
+          contentType: videoFileForAPI.type,
+          fileSize: videoFileForAPI.size
+        })
+    
+    // 上传视频
+        console.log('🔍 [DEBUG] 即将发送axios.post请求到:', uploadUrl)
         const uploadResponse = await axios.post(
-          `${this.apiBaseUrl}/upload`, 
+          uploadUrl, 
           videoFileForAPI,
           {
             headers: {
@@ -1911,7 +1961,7 @@ export default {
             }
           }
         )
-        
+        console.log('🔍 [DEBUG] 上传响应:', uploadResponse.data)
         if (uploadResponse.data.code !== 0) {
           throw new Error(`上传失败: ${uploadResponse.data.error_message || '未知错误'}`)
         }
