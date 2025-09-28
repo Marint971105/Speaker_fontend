@@ -15,7 +15,7 @@
       <div class="score-display">
         <div class="score-circle" :class="anxietyLevelClass">
           <span class="score-value">{{ formattedScore }}</span>
-          <span class="score-label">焦虑指数</span>
+          <span class="score-label">自信度指数</span>
         </div>
         <div class="score-info">
           <div class="anxiety-level">
@@ -130,7 +130,7 @@ export default {
       
       if (isNaN(category)) return '未知';
       
-      const levels = ['重度焦虑', '中度偏重焦虑', '中度焦虑', '轻度偏中焦虑', '轻度焦虑', '不焦虑'];
+      const levels = ['缺乏自信', '不够自信', '一般自信', '比较自信', '很自信', '非常自信'];
       return levels[category] || '未知';
     },
     anxietyDescription() {
@@ -147,12 +147,12 @@ export default {
       if (isNaN(category)) return '';
       
       if (category <= 1) {
-        return '分析结果显示您在演讲过程中焦虑程度较高，可能影响演讲效果。';
+        return '分析结果显示您在演讲过程中自信度较低，焦虑程度较高，可能影响演讲效果。';
       }
       if (category <= 3) {
-        return '分析结果显示您在演讲过程中存在中等程度的焦虑，部分表现受到影响。';
+        return '分析结果显示您在演讲过程中自信度中等，存在一定程度的焦虑，部分表现受到影响。';
       }
-      return '分析结果显示您在演讲过程中焦虑程度较低或无焦虑，表现自信从容。';
+      return '分析结果显示您在演讲过程中自信度较高，焦虑程度较低，表现自信从容。';
     },
     anxietyTips() {
       if (!this.anxietyResult) return [];
@@ -169,8 +169,8 @@ export default {
       
       if (category <= 1) {
         return [
-          '演讲前进行5-10分钟冥想放松',
-          '练习正念呼吸，缓解紧张情绪',
+          '演讲前进行5-10分钟冥想放松，缓解焦虑情绪',
+          '练习正念呼吸，降低紧张程度',
           '可考虑适当的幽默缓解紧张氛围',
           '提前熟悉演讲环境减少不确定性',
           '演讲中允许自己短暂停顿，不必急于填满每一秒'

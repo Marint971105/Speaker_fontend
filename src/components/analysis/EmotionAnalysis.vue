@@ -115,8 +115,7 @@ export default {
         sad: { name: '悲伤', count: 0, class: 'emotion-sad', icon: 'fas fa-sad-tear' },
         angry: { name: '愤怒', count: 0, class: 'emotion-angry', icon: 'fas fa-angry' },
         surprised: { name: '惊讶', count: 0, class: 'emotion-surprised', icon: 'fas fa-surprise' },
-        disgusted: { name: '厌恶', count: 0, class: 'emotion-disgusted', icon: 'fas fa-grimace' },
-        closed: { name: '闭眼', count: 0, class: 'emotion-closed', icon: 'fas fa-eye-slash' }
+        disgusted: { name: '厌恶', count: 0, class: 'emotion-disgusted', icon: 'fas fa-grimace' }
       }
       
       // 统计每种表情出现的次数
@@ -728,6 +727,15 @@ export default {
         const rightEyeOpenness = Math.abs(rightEyeTop.y - rightEye.y)
         const eyeOpenness = (leftEyeOpenness + rightEyeOpenness) / 2
         
+        // 调试信息 - 可以临时启用查看实际数值
+        // console.log('眼睛开合度:', {
+        //   leftEyeOpenness: leftEyeOpenness.toFixed(4),
+        //   rightEyeOpenness: rightEyeOpenness.toFixed(4),
+        //   eyeOpenness: eyeOpenness.toFixed(4),
+        //   mouthCurvature: mouthCurvature.toFixed(4),
+        //   mouthWidth: mouthWidth.toFixed(4)
+        // })
+        
         // 表情判断逻辑
         if (mouthCurvature < -0.015 && mouthWidth > 0.3) {
           // 开心的笑容
@@ -735,15 +743,12 @@ export default {
         } else if (mouthCurvature > 0.01 && leftEyebrowAngle < -0.2 && rightEyebrowAngle > 0.2) {
           // 悲伤表情
           return 'sad'
-        } else if (mouthOpenness > 0.15 && eyeOpenness > 0.1) {
-          // 惊讶表情
+        } else if (mouthOpenness > 0.15 && eyeOpenness > 0.05) {
+          // 惊讶表情 - 确保眼睛是睁开的
           return 'surprised'
         } else if (leftEyebrowAngle < -0.3 && rightEyebrowAngle > 0.3 && mouthWidth < 0.25) {
           // 愤怒表情
           return 'angry'
-        } else if (eyeOpenness < 0.05) {
-          // 闭眼
-          return 'closed'
         } else if (mouthOpenness > 0.1 && mouthWidth < 0.2) {
           // 厌恶表情
           return 'disgusted'
@@ -934,7 +939,6 @@ export default {
 .emotion-icon.emotion-angry { background: #e74c3c; }
 .emotion-icon.emotion-surprised { background: #f39c12; }
 .emotion-icon.emotion-disgusted { background: #34495e; }
-.emotion-icon.emotion-closed { background: #8e44ad; }
 
 .emotion-info {
   flex: 1;
@@ -1011,7 +1015,6 @@ export default {
 .bar-fill.emotion-angry { background: #e74c3c; }
 .bar-fill.emotion-surprised { background: #f39c12; }
 .bar-fill.emotion-disgusted { background: #34495e; }
-.bar-fill.emotion-closed { background: #8e44ad; }
 
 .emotion-value {
   width: 30px;

@@ -38,20 +38,21 @@
             </div>
           </div>
           <div class="video-info">
-            <h3>录制视频 {{ index + 1 }}</h3>
+            <h3>{{ recording.type === 'uploaded' ? '上传视频' : '录制视频' }} {{ index + 1 }}</h3>
             <p>{{ formatDate(recording.timestamp) }}</p>
             <span class="video-size">{{ formatSize(recording.size) }}</span>
+            <span v-if="recording.type === 'uploaded'" class="upload-tag">上传</span>
           </div>
         </div>
       </div>
       
       <div v-else class="no-videos">
         <i class="fas fa-video-slash"></i>
-        <h3>暂无录制视频</h3>
-        <p>请先录制视频，然后返回进行分析</p>
+        <h3>暂无视频</h3>
+        <p>请先录制或上传视频，然后返回进行分析</p>
         <button @click="goToRecord" class="record-btn">
           <i class="fas fa-video"></i>
-          去录制视频
+          去录制/上传视频
         </button>
       </div>
     </div>
@@ -691,6 +692,16 @@ export default {
   border-radius: 10px;
   font-size: 0.8rem;
   color: #666;
+  margin-right: 8px;
+}
+
+.upload-tag {
+  background: #4CAF50;
+  color: white;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 
 /* 无视频状态 */

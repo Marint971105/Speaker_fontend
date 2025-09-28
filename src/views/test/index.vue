@@ -13,11 +13,31 @@
       </div>
     </div>
 
-    <!-- 录制区域 -->
-    <div class="record-section">
-      <!-- 直接内嵌简单的录制界面，避免组件加载问题 -->
-      <div class="inline-video-recorder">
-        <h2>📹 视频录制</h2>
+        <!-- 录制区域 -->
+        <div class="record-section">
+          <!-- 模式选择 -->
+          <div class="mode-selection">
+            <h2>📹 视频录制</h2>
+            <div class="mode-tabs">
+              <button 
+                @click="setMode('record')" 
+                :class="['mode-tab', { active: currentMode === 'record' }]"
+              >
+                <i class="fas fa-video"></i>
+                在线录制
+              </button>
+              <button 
+                @click="setMode('upload')" 
+                :class="['mode-tab', { active: currentMode === 'upload' }]"
+              >
+                <i class="fas fa-upload"></i>
+                上传文件
+              </button>
+            </div>
+          </div>
+
+          <!-- 录制模式 -->
+          <div v-if="currentMode === 'record'" class="inline-video-recorder">
         
         <!-- 视频显示区域 -->
         <div class="video-section">
@@ -62,14 +82,6 @@
             {{ cameraStarted ? '摄像头已启动' : '启动摄像头' }}
           </button>
           
-          <button 
-            @click="runCameraDiagnostic" 
-            :disabled="isRunningDiagnostic"
-            class="btn btn-warning"
-          >
-            <i class="fas fa-search" :class="{ 'fa-spin': isRunningDiagnostic }"></i>
-            {{ isRunningDiagnostic ? '诊断中...' : '摄像头诊断' }}
-          </button>
           
           <button 
             @click="startRecording" 
@@ -164,11 +176,93 @@
           </div>
         </div>
       </div>
+
+      <!-- 上传模式 -->
+      <div v-if="currentMode === 'upload'" class="upload-mode">
+        <div class="upload-section">
+          <h3>📁 上传视频文件</h3>
+          <div class="upload-area" 
+               @click="triggerFileUpload"
+               @dragover.prevent
+               @drop.prevent="handleFileDrop"
+               :class="{ 'drag-over': isDragOver }">
+            <div v-if="!uploadedFile" class="upload-placeholder">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <p>点击选择文件或拖拽文件到此处</p>
+              <p class="upload-hint">支持 MP4 格式，最大 100MB</p>
+            </div>
+            <div v-else class="uploaded-file">
+              <i class="fas fa-file-video"></i>
+              <div class="file-info">
+                <p class="file-name">{{ uploadedFile.name }}</p>
+                <p class="file-size">{{ formatSize(uploadedFile.size) }}</p>
+              </div>
+              <button @click.stop="removeUploadedFile" class="btn btn-sm btn-delete">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+          
+          <input 
+            ref="fileInput"
+            type="file"
+            accept="video/mp4"
+            @change="handleFileSelect"
+            style="display: none"
+          >
+          
+          <div class="upload-controls">
+            <button 
+              @click="triggerFileUpload"
+              class="btn btn-primary"
+              :disabled="isUploading"
+            >
+              <i class="fas fa-folder-open"></i>
+              选择文件
+            </button>
+            
+            <button 
+              @click="processUploadedVideo"
+              :disabled="!uploadedFile || isUploading"
+              class="btn btn-success"
+            >
+              <i class="fas fa-check"></i>
+              {{ isUploading ? '处理中...' : '确认上传' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 上传的视频预览 -->
+        <div v-if="uploadedVideoUrl" class="uploaded-video-section">
+          <h3>▶️ 上传视频预览</h3>
+          <div class="video-container">
+            <video
+              ref="uploadedVideo"
+              class="video-playback"
+              controls
+              playsinline
+              :src="uploadedVideoUrl"
+            ></video>
+          </div>
+        </div>
+
+        <!-- 状态显示 -->
+        <div class="status-section">
+          <div class="status" :class="statusClass">
+            {{ statusMessage }}
+          </div>
+          
+          <div v-if="errorMessage" class="error">
+            <i class="fas fa-exclamation-triangle"></i>
+            {{ errorMessage }}
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 底部导航 -->
     <div class="bottom-nav">
-      <button @click="goToAnalysis" class="nav-btn" :disabled="!hasRecordings">
+      <button @click="goToAnalysis" class="nav-btn" :disabled="!hasRecordings && !uploadedVideoUrl">
         <i class="fas fa-brain"></i>
         进入AI分析
       </button>
@@ -182,6 +276,8 @@ export default {
   data() {
     return {
       hasRecordings: false,
+      // 模式选择
+      currentMode: 'record', // 'record' 或 'upload'
       // 录制相关状态
       cameraStarted: false,
       isRecording: false,
@@ -195,9 +291,11 @@ export default {
       timerInterval: null,
       // 媒体相关
       mediaStream: null,
-      mediaRecorder: null,
-      recordedChunks: [],
-      isRunningDiagnostic: false
+      // 上传相关状态
+      uploadedFile: null,
+      uploadedVideoUrl: null,
+      isUploading: false,
+      isDragOver: false,
     }
   },
   mounted() {
@@ -214,6 +312,128 @@ export default {
     this.cleanup()
   },
   methods: {
+    // 模式切换
+    setMode(mode) {
+      this.currentMode = mode
+      if (mode === 'record') {
+        this.statusMessage = '点击启动摄像头开始'
+        this.statusClass = ''
+      } else if (mode === 'upload') {
+        this.statusMessage = '选择或拖拽视频文件上传'
+        this.statusClass = ''
+      }
+      this.clearError()
+    },
+
+    // 文件上传相关方法
+    triggerFileUpload() {
+      this.$refs.fileInput.click()
+    },
+
+    handleFileSelect(event) {
+      const file = event.target.files[0]
+      if (file) {
+        this.validateAndSetFile(file)
+      }
+    },
+
+    handleFileDrop(event) {
+      this.isDragOver = false
+      const files = event.dataTransfer.files
+      if (files.length > 0) {
+        this.validateAndSetFile(files[0])
+      }
+    },
+
+    validateAndSetFile(file) {
+      // 验证文件类型
+      if (!file.type.startsWith('video/')) {
+        this.setError('请选择视频文件')
+        return
+      }
+
+      // 验证文件大小 (100MB)
+      const maxSize = 100 * 1024 * 1024
+      if (file.size > maxSize) {
+        this.setError('文件大小不能超过 100MB')
+        return
+      }
+
+      this.uploadedFile = file
+      this.clearError()
+      this.setStatus('文件选择成功，点击确认上传', 'success')
+    },
+
+    removeUploadedFile() {
+      // 如果上传的视频已经保存到localStorage，需要从中删除
+      if (this.uploadedFile) {
+        const saved = localStorage.getItem('video_recordings')
+        if (saved) {
+          let recordings = JSON.parse(saved)
+          // 找到并删除上传的视频记录
+          recordings = recordings.filter(recording => recording.type !== 'uploaded' || recording.url !== this.uploadedVideoUrl)
+          localStorage.setItem('video_recordings', JSON.stringify(recordings))
+          this.recordings = recordings
+        }
+      }
+
+      this.uploadedFile = null
+      this.uploadedVideoUrl = null
+      this.$refs.fileInput.value = ''
+      this.setStatus('已移除文件', 'info')
+    },
+
+    async processUploadedVideo() {
+      if (!this.uploadedFile) return
+
+      try {
+        this.isUploading = true
+        this.setStatus('正在处理视频文件...', 'loading')
+
+        // 创建视频URL用于预览
+        this.uploadedVideoUrl = URL.createObjectURL(this.uploadedFile)
+
+        // 将上传的视频保存到localStorage，与录制视频使用相同的格式
+        const uploadedRecording = {
+          id: 'uploaded_' + Date.now(),
+          name: this.uploadedFile.name,
+          size: this.uploadedFile.size,
+          timestamp: new Date().toISOString(),
+          type: 'uploaded',
+          url: this.uploadedVideoUrl,
+          file: this.uploadedFile // 保存文件对象用于后续处理
+        }
+
+        // 获取现有的录制记录
+        let recordings = []
+        const saved = localStorage.getItem('video_recordings')
+        if (saved) {
+          recordings = JSON.parse(saved)
+        }
+
+        // 添加上传的视频到记录中
+        recordings.unshift(uploadedRecording) // 添加到开头，优先显示
+
+        // 保存到localStorage
+        localStorage.setItem('video_recordings', JSON.stringify(recordings))
+
+        // 更新本地状态
+        this.recordings = recordings
+        this.hasRecordings = true
+
+        // 模拟处理时间
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        this.setStatus('视频上传成功，可以进入AI分析', 'success')
+
+      } catch (error) {
+        console.error('处理视频失败:', error)
+        this.setError('处理视频失败: ' + error.message)
+      } finally {
+        this.isUploading = false
+      }
+    },
+
     goToAnalysis() {
       this.$router.push('/homeworkTrial/video/analysis')
     },
@@ -624,168 +844,6 @@ export default {
       }
     },
 
-    // 运行摄像头诊断
-    async runCameraDiagnostic() {
-      try {
-        this.setStatus('正在运行摄像头诊断...', 'loading')
-        this.isRunningDiagnostic = true
-        this.clearError()
-        
-        const diagnosticResults = []
-        
-        // 1. 检查浏览器API支持
-        console.log('📋 开始摄像头诊断...')
-        
-        if (!navigator.mediaDevices) {
-          diagnosticResults.push('❌ 浏览器不支持 MediaDevices API')
-        } else {
-          diagnosticResults.push('✅ 浏览器支持 MediaDevices API')
-        }
-        
-        if (!navigator.mediaDevices.getUserMedia) {
-          diagnosticResults.push('❌ 浏览器不支持 getUserMedia')
-        } else {
-          diagnosticResults.push('✅ 浏览器支持 getUserMedia')
-        }
-        
-        if (typeof MediaRecorder === 'undefined') {
-          diagnosticResults.push('❌ 浏览器不支持 MediaRecorder')
-        } else {
-          diagnosticResults.push('✅ 浏览器支持 MediaRecorder')
-        }
-        
-        // 2. 检查可用设备
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices()
-          const videoDevices = devices.filter(device => device.kind === 'videoinput')
-          const audioDevices = devices.filter(device => device.kind === 'audioinput')
-          
-          diagnosticResults.push(`📹 发现 ${videoDevices.length} 个视频设备`)
-          diagnosticResults.push(`🎤 发现 ${audioDevices.length} 个音频设备`)
-          
-          if (videoDevices.length === 0) {
-            diagnosticResults.push('⚠️ 未发现摄像头设备')
-          } else {
-            videoDevices.forEach((device, index) => {
-              diagnosticResults.push(`  📹 设备${index + 1}: ${device.label || '未知设备'}`)
-            })
-          }
-          
-          if (audioDevices.length === 0) {
-            diagnosticResults.push('⚠️ 未发现麦克风设备')
-          } else {
-            audioDevices.forEach((device, index) => {
-              diagnosticResults.push(`  🎤 设备${index + 1}: ${device.label || '未知设备'}`)
-            })
-          }
-        } catch (error) {
-          diagnosticResults.push(`❌ 设备枚举失败: ${error.message}`)
-        }
-        
-        // 3. 测试权限和设备访问
-        const testConfigs = [
-          { name: '基础视频', config: { video: true, audio: false } },
-          { name: '高质量视频', config: { video: { width: 1280, height: 720 }, audio: false } },
-          { name: '视频+音频', config: { video: true, audio: true } }
-        ]
-        
-        for (const test of testConfigs) {
-          try {
-            const testStream = await navigator.mediaDevices.getUserMedia(test.config)
-            diagnosticResults.push(`✅ ${test.name}测试通过`)
-            
-            // 获取实际配置信息
-            const videoTrack = testStream.getVideoTracks()[0]
-            if (videoTrack) {
-              const settings = videoTrack.getSettings()
-              diagnosticResults.push(`  📐 实际分辨率: ${settings.width}x${settings.height}`)
-              diagnosticResults.push(`  🎞️ 帧率: ${settings.frameRate || '未知'}`)
-            }
-            
-            const audioTrack = testStream.getAudioTracks()[0]
-            if (audioTrack) {
-              const audioSettings = audioTrack.getSettings()
-              diagnosticResults.push(`  🔊 采样率: ${audioSettings.sampleRate || '未知'}`)
-            }
-            
-            // 关闭测试流
-            testStream.getTracks().forEach(track => track.stop())
-            
-          } catch (error) {
-            diagnosticResults.push(`❌ ${test.name}测试失败: ${error.name} - ${error.message}`)
-            
-            // 分析具体错误原因
-            if (error.name === 'NotAllowedError') {
-              diagnosticResults.push('  💡 解决方案: 点击地址栏摄像头图标，允许访问')
-            } else if (error.name === 'NotFoundError') {
-              diagnosticResults.push('  💡 解决方案: 检查摄像头连接和驱动程序')
-            } else if (error.name === 'AbortError') {
-              diagnosticResults.push('  💡 解决方案: 关闭其他使用摄像头的程序')
-            } else if (error.name === 'OverconstrainedError') {
-              diagnosticResults.push('  💡 解决方案: 降低视频质量要求')
-            }
-          }
-        }
-        
-        // 4. 浏览器信息
-        diagnosticResults.push('🌐 浏览器信息:')
-        diagnosticResults.push(`  User Agent: ${navigator.userAgent}`)
-        diagnosticResults.push(`  是否HTTPS: ${location.protocol === 'https:' ? '是' : '否'}`)
-        
-        // 5. 检查录制格式支持
-        const supportedFormats = [
-          'video/mp4',
-          'video/webm;codecs=vp8',
-          'video/webm;codecs=vp9',
-          'video/webm;codecs=h264'
-        ]
-        
-        diagnosticResults.push('🎥 支持的录制格式:')
-        supportedFormats.forEach(format => {
-          if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(format)) {
-            diagnosticResults.push(`  ✅ ${format}`)
-          } else {
-            diagnosticResults.push(`  ❌ ${format}`)
-          }
-        })
-        
-        // 输出诊断结果
-        console.log('📋 摄像头诊断结果:')
-        diagnosticResults.forEach(result => console.log(result))
-        
-        // 生成诊断报告
-        const report = diagnosticResults.join('\n')
-        
-        // 显示诊断结果弹窗
-        this.$confirm(report, '摄像头诊断报告', {
-          confirmButtonText: '复制报告',
-          cancelButtonText: '关闭',
-          type: 'info',
-          customClass: 'diagnostic-dialog',
-          beforeClose: (action, instance, done) => {
-            if (action === 'confirm') {
-              // 复制诊断报告到剪贴板
-              navigator.clipboard.writeText(report).then(() => {
-                this.$message.success('诊断报告已复制到剪贴板')
-              }).catch(() => {
-                this.$message.warning('复制失败，请手动复制控制台内容')
-              })
-            }
-            done()
-          }
-        }).catch(() => {
-          // 用户取消，不做任何处理
-        })
-        
-        this.setStatus('摄像头诊断完成，查看控制台了解详情', 'success')
-        
-      } catch (error) {
-        console.error('运行摄像头诊断失败:', error)
-        this.showError(`摄像头诊断失败: ${error.message}`)
-      } finally {
-        this.isRunningDiagnostic = false
-      }
-    }
   }
 }
 </script>
@@ -1259,28 +1317,175 @@ export default {
   }
 }
 
-/* 诊断对话框样式 */
-.diagnostic-dialog {
-  width: 800px !important;
-  max-width: 90vw;
+/* 模式选择样式 */
+.mode-selection {
+  text-align: center;
+  margin-bottom: 30px;
 }
 
-.diagnostic-dialog .el-message-box__content {
-  white-space: pre-line;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.4;
-  max-height: 400px;
-  overflow-y: auto;
-  background: #f5f5f5;
-  padding: 15px;
-  border-radius: 5px;
-  margin: 10px 0;
+.mode-selection h2 {
+  color: white;
+  margin-bottom: 20px;
+  font-size: 1.8rem;
 }
 
-.diagnostic-dialog .el-message-box__title {
-  font-size: 16px;
+.mode-tabs {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.mode-tab {
+  padding: 12px 24px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mode-tab:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.mode-tab.active {
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  border-color: white;
+}
+
+/* 上传模式样式 */
+.upload-mode {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 15px;
+  padding: 30px;
+  margin-bottom: 20px;
+}
+
+.upload-section h3 {
+  color: white;
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.upload-area {
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 15px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-area:hover,
+.upload-area.drag-over {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.upload-placeholder {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.upload-placeholder i {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.upload-placeholder p {
+  margin: 8px 0;
+  font-size: 1.1rem;
+}
+
+.upload-hint {
+  font-size: 0.9rem !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.uploaded-file {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: white;
+  width: 100%;
+}
+
+.uploaded-file i {
+  font-size: 2rem;
+  color: #4CAF50;
+}
+
+.file-info {
+  flex: 1;
+  text-align: left;
+}
+
+.file-name {
   font-weight: bold;
-  color: #333;
+  margin: 0 0 5px 0;
+  font-size: 1.1rem;
 }
+
+.file-size {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+}
+
+.upload-controls {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.uploaded-video-section {
+  margin-top: 30px;
+}
+
+.uploaded-video-section h3 {
+  color: white;
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 1.3rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .mode-tabs {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .mode-tab {
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  .upload-area {
+    padding: 20px;
+    min-height: 150px;
+  }
+  
+  .upload-controls {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
 </style>
