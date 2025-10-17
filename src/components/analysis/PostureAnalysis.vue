@@ -37,23 +37,92 @@
       </div>
     </div>
 
-    <!-- 检测结果显示 -->
+    <!-- 实时检测状态 -->
     <div class="detection-results">
       <div class="result-item">
-        <span class="label">动作状态:</span>
+        <span class="label">姿态状态</span>
         <span class="value">{{ currentPosture }}</span>
       </div>
-      <div class="divider"></div>
       <div class="result-item">
-        <span class="label">表情状态:</span>
+        <span class="label">表情状态</span>
         <span class="value">{{ currentEmotion }}</span>
       </div>
-      <div class="divider"></div>
       <div class="result-item">
-        <span class="label">分析状态:</span>
+        <span class="label">分析状态</span>
         <span class="value" :class="{'status-active': isAnalyzing}">
           {{ isAnalyzing ? '分析中' : '未分析' }}
         </span>
+      </div>
+    </div>
+    
+    <!-- 分析统计结果 -->
+    <div v-if="analysisResults.totalFrames > 0" class="analysis-stats">
+      <!-- 综合评分 -->
+      <div class="score-card">
+        <div class="score-circle" :style="{borderColor: qualityLevel.color}">
+          <div class="score-number" :style="{color: qualityLevel.color}">{{ overallScore }}</div>
+          <div class="score-label">综合评分</div>
+        </div>
+        <div class="score-info">
+          <div class="score-level" :style="{color: qualityLevel.color}">
+            <i class="fas fa-award"></i>
+            {{ qualityLevel.text }}
+          </div>
+          <div class="score-breakdown">
+            <span>姿态: {{ postureScore }}分</span>
+            <span class="divider">|</span>
+            <span>表情: {{ emotionScore }}分</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 姿态统计 -->
+      <div class="stats-section">
+        <h4><i class="fas fa-user"></i> 姿态分布</h4>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <i class="fas fa-check-circle" style="color: #67C23A"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.posture.straight / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">端正</span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-exclamation-triangle" style="color: #E6A23C"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.posture.hunched / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">驼背</span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-compress-arrows-alt" style="color: #F56C6C"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.posture.leaning / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">歪斜</span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-hand-paper" style="color: #409EFF"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.posture.handsRaised / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">举手</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 表情统计 -->
+      <div class="stats-section">
+        <h4><i class="fas fa-smile"></i> 表情分布</h4>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <i class="fas fa-laugh-beam" style="color: #67C23A"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.emotion.smile / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">微笑</span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-meh" style="color: #909399"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.emotion.neutral / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">平静</span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-frown" style="color: #F56C6C"></i>
+            <span class="stat-value">{{ Math.round(analysisResults.emotion.frown / analysisResults.totalFrames * 100) }}%</span>
+            <span class="stat-label">皱眉</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -84,7 +153,111 @@ export default {
       canvas: null,
       ctx: null,
       video: null,
-      animationFrame: null
+      animationFrame: null,
+      postureHistory: [], // 姿态历史记录
+      emotionHistory: [], // 表情历史记录
+      analysisResults: {
+        posture: {
+          straight: 0,
+          leaning: 0,
+          hunched: 0,
+          handsRaised: 0
+        },
+        emotion: {
+          smile: 0,
+          neutral: 0,
+          frown: 0
+        },
+        totalFrames: 0
+      }
+    }
+  },
+
+  computed: {
+    // 姿态评分
+    postureScore() {
+      if (this.analysisResults.totalFrames === 0) return 0
+      
+      const { straight, leaning, hunched, handsRaised } = this.analysisResults.posture
+      const total = this.analysisResults.totalFrames
+      
+      // 挺直加分，弯腰驼背扣分
+      let score = 100
+      const straightRatio = straight / total
+      const hunchedRatio = hunched / total
+      const leaningRatio = leaning / total
+      
+      // 挺直姿态加分
+      if (straightRatio > 0.7) {
+        score += 0
+      } else if (straightRatio > 0.5) {
+        score -= 10
+      } else {
+        score -= 20
+      }
+      
+      // 驼背扣分
+      if (hunchedRatio > 0.3) {
+        score -= 30
+      } else if (hunchedRatio > 0.15) {
+        score -= 15
+      }
+      
+      // 歪斜扣分
+      if (leaningRatio > 0.4) {
+        score -= 20
+      } else if (leaningRatio > 0.2) {
+        score -= 10
+      }
+      
+      return Math.max(0, Math.min(100, Math.round(score)))
+    },
+    
+    // 表情评分
+    emotionScore() {
+      if (this.analysisResults.totalFrames === 0) return 0
+      
+      const { smile, neutral, frown } = this.analysisResults.emotion
+      const total = this.analysisResults.totalFrames
+      
+      const smileRatio = smile / total
+      const frownRatio = frown / total
+      
+      let score = 70 // 基础分
+      
+      // 微笑加分
+      if (smileRatio > 0.5) {
+        score += 30
+      } else if (smileRatio > 0.3) {
+        score += 20
+      } else if (smileRatio > 0.1) {
+        score += 10
+      }
+      
+      // 皱眉扣分
+      if (frownRatio > 0.3) {
+        score -= 20
+      } else if (frownRatio > 0.15) {
+        score -= 10
+      }
+      
+      return Math.max(0, Math.min(100, Math.round(score)))
+    },
+    
+    // 综合评分
+    overallScore() {
+      if (this.analysisResults.totalFrames === 0) return 0
+      return Math.round((this.postureScore * 0.6 + this.emotionScore * 0.4))
+    },
+    
+    // 质量等级
+    qualityLevel() {
+      const score = this.overallScore
+      if (score >= 90) return { text: '优秀', color: '#67C23A' }
+      if (score >= 80) return { text: '良好', color: '#95D475' }
+      if (score >= 70) return { text: '中等', color: '#E6A23C' }
+      if (score >= 60) return { text: '及格', color: '#F56C6C' }
+      return { text: '待改进', color: '#909399' }
     }
   },
 
@@ -357,25 +530,53 @@ export default {
       }
 
       const landmarks = results.poseLandmarks
+      this.analysisResults.totalFrames++
       
-      // 简单的姿态判断逻辑
       // 检查手是否举起
       const leftHandRaised = landmarks[15].y < landmarks[11].y
       const rightHandRaised = landmarks[16].y < landmarks[12].y
       
-      // 检查是否站立/坐下
-      const hipY = (landmarks[23].y + landmarks[24].y) / 2
-      const kneeY = (landmarks[25].y + landmarks[26].y) / 2
-      const isStanding = Math.abs(hipY - kneeY) > 0.2
+      // 检查肩膀水平度（判断是否歪斜）
+      const leftShoulder = landmarks[11]
+      const rightShoulder = landmarks[12]
+      const shoulderAngle = Math.abs(leftShoulder.y - rightShoulder.y)
+      const isLeaning = shoulderAngle > 0.05
       
-      // 更新姿态状态
+      // 检查脊柱姿态（判断是否驼背）
+      const nose = landmarks[0]
+      const midShoulder = { y: (leftShoulder.y + rightShoulder.y) / 2 }
+      const midHip = { y: (landmarks[23].y + landmarks[24].y) / 2 }
+      
+      // 计算头部前倾程度
+      const neckAngle = nose.y - midShoulder.y
+      const isHunched = neckAngle < -0.05 // 头部明显低于肩膀
+      
+      // 检查挺直姿态
+      const backStraight = !isHunched && !isLeaning && Math.abs(midShoulder.y - midHip.y) > 0.15
+      
+      // 更新统计
       if (leftHandRaised || rightHandRaised) {
         this.currentPosture = '举手'
-      } else if (isStanding) {
-        this.currentPosture = '站立'
+        this.analysisResults.posture.handsRaised++
+      } else if (isHunched) {
+        this.currentPosture = '驼背'
+        this.analysisResults.posture.hunched++
+      } else if (isLeaning) {
+        this.currentPosture = '歪斜'
+        this.analysisResults.posture.leaning++
+      } else if (backStraight) {
+        this.currentPosture = '姿态端正'
+        this.analysisResults.posture.straight++
       } else {
         this.currentPosture = '坐下'
+        this.analysisResults.posture.straight++ // 坐下也算正常姿态
       }
+      
+      // 记录历史
+      this.postureHistory.push({
+        timestamp: this.video ? this.video.currentTime : 0,
+        posture: this.currentPosture
+      })
     },
 
     analyzeEmotion(results) {
@@ -386,21 +587,33 @@ export default {
 
       const landmarks = results.faceLandmarks
       
-      // 简单的表情判断逻辑
-      // 检查嘴角位置判断是否微笑
+      // 检查嘴角位置判断表情
       const leftMouthCorner = landmarks[61]
       const rightMouthCorner = landmarks[291]
       const upperLip = landmarks[0]
       
       const mouthAngle = (leftMouthCorner.y + rightMouthCorner.y) / 2 - upperLip.y
       
+      let emotion = 'neutral'
       if (mouthAngle > 0.02) {
         this.currentEmotion = '微笑'
+        emotion = 'smile'
+        this.analysisResults.emotion.smile++
       } else if (mouthAngle < -0.02) {
         this.currentEmotion = '皱眉'
+        emotion = 'frown'
+        this.analysisResults.emotion.frown++
       } else {
         this.currentEmotion = '平静'
+        emotion = 'neutral'
+        this.analysisResults.emotion.neutral++
       }
+      
+      // 记录历史
+      this.emotionHistory.push({
+        timestamp: this.video ? this.video.currentTime : 0,
+        emotion: emotion
+      })
     },
 
     stopAnalysis() {
@@ -431,9 +644,8 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 15px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
 }
 
 .content-wrapper {
@@ -499,36 +711,45 @@ export default {
 }
 
 .detection-results {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  padding: 10px 15px;
-  background: white;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  font-size: 13px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
+  font-size: 12px;
 }
 
 .result-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
+  }
   
   .label {
-    color: #606266;
+    color: #909399;
+    font-size: 11px;
+    font-weight: 500;
   }
   
   .value {
     color: #409EFF;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 14px;
   }
 }
 
 .divider {
-  width: 1px;
-  height: 14px;
-  background: #DCDFE6;
+  display: none;
 }
 
 .status-active {
@@ -540,5 +761,138 @@ export default {
   0% { opacity: 1; }
   50% { opacity: 0.6; }
   100% { opacity: 1; }
+}
+
+// 分析统计结果
+.analysis-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+  background: transparent;
+}
+
+.score-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.score-circle {
+  width: 80px;
+  height: 80px;
+  border: 4px solid #67C23A;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: white;
+  box-shadow: 0 2px 8px rgba(103, 194, 58, 0.2);
+}
+
+.score-number {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 10px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.score-info {
+  flex: 1;
+}
+
+.score-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  
+  i {
+    font-size: 20px;
+  }
+}
+
+.score-breakdown {
+  font-size: 13px;
+  color: #666;
+  
+  .divider {
+    margin: 0 8px;
+    color: #DCDFE6;
+  }
+}
+
+.stats-section {
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+  
+  h4 {
+    margin: 0 0 12px 0;
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    i {
+      font-size: 16px;
+      color: #409EFF;
+    }
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 12px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: white;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  i {
+    font-size: 24px;
+  }
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #909399;
+  font-weight: 500;
 }
 </style> 

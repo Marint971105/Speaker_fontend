@@ -1,0 +1,95 @@
+/**
+ * 登录页面按钮居中修复 - 生产环境样式覆盖
+ * 用于解决 Element UI 在生产环境打包后按钮右对齐的问题
+ */
+
+/* 强制登录表单中的所有按钮居中 */
+.login {
+  .login-form {
+    .el-button {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      float: none !important;
+      
+      /* 按钮内部文字居中 */
+      > span {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        text-align: center !important;
+        display: inline-block !important;
+        width: 100% !important;
+      }
+      
+      /* loading 状态特殊处理 */
+      &.is-loading > span {
+        margin-left: 0 !important;
+      }
+      
+      /* 不同尺寸的按钮 */
+      &.el-button--medium,
+      &.el-button--small,
+      &.el-button--mini {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+      
+      /* 不同类型的按钮 */
+      &.el-button--primary,
+      &.el-button--success,
+      &.el-button--warning,
+      &.el-button--danger,
+      &.el-button--info,
+      &.el-button--text {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+    }
+    
+    /* 按钮组内的按钮 */
+    .button-group .el-button {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      float: none !important;
+    }
+    
+    /* el-form-item 内的按钮 */
+    .el-form-item__content .el-button {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+  }
+  
+  /* 代理卡片按钮 */
+  .agent-card {
+    .el-button {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: 100% !important;
+      text-align: center !important;
+      
+      > span {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        text-align: center !important;
+      }
+    }
+  }
+}
+
+/* 全局覆盖 - 确保登录页面的输入框图标垂直居中 */
+.login {
+  .el-input__prefix {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  
+  .el-input__icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+

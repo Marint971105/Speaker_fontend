@@ -232,30 +232,73 @@
               </div>
             </div>
             
-            <!-- 分析结果 -->
-            <div v-else-if="anxietyResult && !anxietyResult.error" class="result-display">
-              <div class="score-display">
-                <div class="score-circle" :class="anxietyLevelClass">
-                  <span class="score-value">{{ formattedScore }}</span>
-                  <span class="score-label">焦虑指数</span>
-                </div>
-                <div class="score-info">
-                  <div class="anxiety-level">
-                    <span class="level-badge" :class="anxietyLevelClass">
-                      {{ anxietyLevelText }}
+            <!-- 分析结果 - 优化后的布局 -->
+            <div v-else-if="anxietyResult && !anxietyResult.error" class="anxiety-result-container">
+              <!-- 简洁的头部信息 -->
+              <div class="anxiety-header">
+                <div class="header-info">
+                  <div class="analysis-title">
+                    <i class="fas fa-brain"></i>
+                    <span>焦虑分析</span>
+                    <span class="status-indicator">
+                      <i class="fas fa-check-circle"></i>
+                      分析完成
                     </span>
                   </div>
-                  <p class="description">{{ anxietyDescription }}</p>
+                  <div class="confidence-display">
+                    <span class="confidence-label">置信度</span>
+                    <span class="confidence-value">{{ anxietyResult.confidence_score ? anxietyResult.confidence_score.toFixed(1) : '0.0' }}%</span>
+                  </div>
                 </div>
               </div>
-              
-              <div class="recommendations">
-                <h4><i class="fas fa-lightbulb"></i> 建议</h4>
-                <ul>
-                  <li v-for="(tip, index) in anxietyTips" :key="index">
-                    {{ tip }}
-                  </li>
-                </ul>
+
+              <!-- 主要内容区域 -->
+              <div class="anxiety-main-content">
+                <!-- 分数和状态展示 -->
+                <div class="anxiety-score-section">
+                  <div class="anxiety-score-circle" :class="anxietyLevelClass">
+                    <div class="score-inner">
+                      <span class="score-value">{{ formattedScore }}</span>
+                      <span class="score-label">自信指数</span>
+                    </div>
+                  </div>
+                  <div class="anxiety-status-info">
+                    <div class="anxiety-level">
+                      <span class="anxiety-level-text" :class="anxietyLevelClass">
+                        {{ anxietyLevelText }}
+                      </span>
+                    </div>
+                    <p class="anxiety-description">{{ anxietyDescription }}</p>
+                  </div>
+                </div>
+
+                <!-- 建议区域 -->
+                <div class="anxiety-recommendations">
+                  <div class="recommendations-header">
+                    <i class="fas fa-lightbulb"></i>
+                    <h4>个性化建议</h4>
+                  </div>
+                  <div class="anxiety-tips-list">
+                    <div 
+                      v-for="(tip, index) in anxietyTips" 
+                      :key="index"
+                      class="anxiety-tip-item"
+                    >
+                      {{ tip }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 底部信息 -->
+                <div class="anxiety-footer">
+                  <div class="analysis-time">
+                    <i class="fas fa-clock"></i>
+                    <span>分析时间: {{ analysisTime }}</span>
+                  </div>
+                  <div class="analysis-details">
+                    <span>处理时间: {{ anxietyResult.processing_time ? anxietyResult.processing_time.toFixed(2) : '0.00' }}s</span>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -456,100 +499,110 @@ export default {
       return this.analysisMode === 'all' || this.analysisMode === 'audio'
     },
     
-    // 焦虑分析计算属性 (保持原有逻辑)
+    // 焦虑分析计算属性 - 根据prediction值优化显示
     formattedScore() {
-      if (!this.anxietyResult) return '0';
-      return parseFloat(JSON.parse(this.anxietyResult.score100)[0]).toFixed(0);
+      if (!this.anxietyResult || this.anxietyResult.error) return '0';
+      // 使用confidence_score作为显示分数，分数越高代表越自信不焦虑
+      return this.anxietyResult.confidence_score ? this.anxietyResult.confidence_score.toFixed(1) : '0';
     },
     anxietyLevelClass() {
-      if (!this.anxietyResult) return '';
-      const categoryStr = this.anxietyResult.category;
-      let category;
-      try {
-        const parsedArray = JSON.parse(categoryStr);
-        category = Array.isArray(parsedArray) ? parsedArray[0] : parseInt(categoryStr);
-      } catch (e) {
-        category = parseInt(categoryStr);
+      if (!this.anxietyResult || this.anxietyResult.error) return '';
+      
+      // 根据prediction值判断焦虑等级
+      const prediction = this.anxietyResult.prediction;
+      
+      if (prediction === 0) {
+        return 'level-excellent'; // 非常自信
+      } else if (prediction === 1) {
+        return 'level-good'; // 轻微焦虑
+      } else if (prediction === 2) {
+        return 'level-medium'; // 中度焦虑
+      } else if (prediction === 3) {
+        return 'level-warning'; // 较严重焦虑
+      } else if (prediction === 4) {
+        return 'level-danger'; // 严重焦虑
+      } else {
+        return 'level-unknown';
       }
-      
-      if (isNaN(category)) return '';
-      
-      if (category <= 1) return 'level-high';
-      if (category <= 3) return 'level-medium';
-      return 'level-low';
     },
     anxietyLevelText() {
-      if (!this.anxietyResult) return '未知';
-      const categoryStr = this.anxietyResult.category;
-      let category;
-      try {
-        const parsedArray = JSON.parse(categoryStr);
-        category = Array.isArray(parsedArray) ? parsedArray[0] : parseInt(categoryStr);
-      } catch (e) {
-        category = parseInt(categoryStr);
-      }
+      if (!this.anxietyResult || this.anxietyResult.error) return '未知';
       
-      if (isNaN(category)) return '未知';
+      // 根据prediction值显示对应的文本
+      const prediction = this.anxietyResult.prediction;
+      const predictionTexts = {
+        0: '非常自信（无焦虑）',
+        1: '轻微焦虑',
+        2: '中度焦虑',
+        3: '较严重焦虑',
+        4: '严重焦虑'
+      };
       
-      const levels = ['重度焦虑', '中度偏重焦虑', '中度焦虑', '轻度偏中焦虑', '轻度焦虑', '不焦虑'];
-      return levels[category] || '未知';
+      return predictionTexts[prediction] || '未知';
     },
     anxietyDescription() {
-      if (!this.anxietyResult) return '';
-      const categoryStr = this.anxietyResult.category;
-      let category;
-      try {
-        const parsedArray = JSON.parse(categoryStr);
-        category = Array.isArray(parsedArray) ? parsedArray[0] : parseInt(categoryStr);
-      } catch (e) {
-        category = parseInt(categoryStr);
-      }
+      if (!this.anxietyResult || this.anxietyResult.error) return '';
       
-      if (isNaN(category)) return '';
+      const prediction = this.anxietyResult.prediction;
+      const confidenceScore = this.anxietyResult.confidence_score;
       
-      if (category <= 1) {
-        return '分析结果显示您在演讲过程中焦虑程度较高，可能影响演讲效果。';
-      }
-      if (category <= 3) {
-        return '分析结果显示您在演讲过程中存在中等程度的焦虑，部分表现受到影响。';
-      }
-      return '分析结果显示您在演讲过程中焦虑程度较低或无焦虑，表现自信从容。';
+      const descriptions = {
+        0: `分析结果显示您在演讲过程中非常自信，完全没有焦虑表现，演讲状态极佳。`,
+        1: `分析结果显示您在演讲过程中存在轻微焦虑，整体表现良好，仅有轻微紧张。`,
+        2: `分析结果显示您在演讲过程中存在中度焦虑，可能影响部分表现，需要适当调整。`,
+        3: `分析结果显示您在演讲过程中存在较严重焦虑，明显影响演讲效果，建议采取改善措施。`,
+        4: `分析结果显示您在演讲过程中存在严重焦虑，严重影响演讲表现，需要重点关注和改善。`
+      };
+      
+      return descriptions[prediction] || '分析结果异常，请重试。';
     },
     anxietyTips() {
-      if (!this.anxietyResult) return [];
-      const categoryStr = this.anxietyResult.category;
-      let category;
-      try {
-        const parsedArray = JSON.parse(categoryStr);
-        category = Array.isArray(parsedArray) ? parsedArray[0] : parseInt(categoryStr);
-      } catch (e) {
-        category = parseInt(categoryStr);
-      }
+      if (!this.anxietyResult || this.anxietyResult.error) return [];
       
-      if (isNaN(category)) return [];
+      const prediction = this.anxietyResult.prediction;
       
-      if (category <= 1) {
-        return [
-          '演讲前进行5-10分钟冥想放松',
-          '练习正念呼吸，缓解紧张情绪',
-          '可考虑适当的幽默缓解紧张氛围',
-          '提前熟悉演讲环境减少不确定性',
-          '演讲中允许自己短暂停顿，不必急于填满每一秒'
-        ];
-      }
-      if (category <= 3) {
-        return [
-          '演讲前进行深呼吸放松练习',
-          '增加演讲彩排次数增强信心',
-          '注意控制语速，给自己思考空间',
-          '关注积极的听众反馈'
-        ];
-      }
-      return [
-        '继续保持良好的演讲状态',
-        '可尝试增加演讲的互动性',
-        '适当加入个人故事增强亲和力'
-      ];
+      const tipsByLevel = {
+        0: [
+          '🎉 恭喜！您的演讲状态非常优秀',
+          '💡 可以尝试挑战更高难度的演讲内容',
+          '🌟 考虑增加与听众的互动环节',
+          '📚 可以分享更多个人经验和故事',
+          '🎯 尝试在演讲中加入更多创意元素'
+        ],
+        1: [
+          '😌 演讲前进行简单的深呼吸练习',
+          '🎵 听一些轻松的音乐缓解紧张',
+          '💪 增加演讲彩排次数增强信心',
+          '👥 多与朋友练习演讲技巧',
+          '🌱 保持积极的心态和自信'
+        ],
+        2: [
+          '🧘 演讲前进行5-10分钟冥想放松',
+          '🫁 练习正念呼吸，缓解紧张情绪',
+          '😄 可考虑适当的幽默缓解紧张氛围',
+          '🏠 提前熟悉演讲环境减少不确定性',
+          '⏸️ 演讲中允许自己短暂停顿，不必急于填满每一秒'
+        ],
+        3: [
+          '🆘 建议寻求专业演讲指导',
+          '🧠 学习压力管理和放松技巧',
+          '📖 阅读演讲技巧相关书籍',
+          '🎭 从简单的演讲场景开始练习',
+          '💊 考虑咨询心理医生或专业教练',
+          '🏃 通过运动释放压力和紧张情绪'
+        ],
+        4: [
+          '🚨 强烈建议寻求专业帮助',
+          '👨‍⚕️ 咨询心理医生或专业治疗师',
+          '📚 系统学习焦虑管理技巧',
+          '🏥 考虑参加焦虑管理课程',
+          '🤝 寻找演讲伙伴或支持小组',
+          '⏰ 给自己充足的时间来改善',
+          '💝 记住：改善需要时间和耐心'
+        ]
+      };
+      
+      return tipsByLevel[prediction] || ['请重试分析'];
     }
   },
   
@@ -1902,21 +1955,10 @@ export default {
       }
     },
     
-    // 焦虑分析 (保持原有逻辑)
+    // 焦虑分析 - 使用新的API接口
     async analyzeAnxiety() {
-      console.log('🔍 [DEBUG] analyzeAnxiety() 开始')
-      console.log('🔍 [DEBUG] analyzeAnxiety() 时的 apiBaseUrl:', this.apiBaseUrl)
-      console.log('🔍 [DEBUG] analyzeAnxiety() 时的环境变量:', {
-        VUE_APP_ANALYSIS_API: process.env.VUE_APP_ANALYSIS_API,
-        NODE_ENV: process.env.NODE_ENV
-      })
-      console.log('🔍 [DEBUG] analyzeAnxiety() 时的 this 对象:', {
-        apiBaseUrl: this.apiBaseUrl,
-        recordingConfirmed: this.recordingConfirmed,
-        isAnalyzing: this.isAnalyzing
-      })
+      console.log('🔍 [DEBUG] analyzeAnxiety() 开始 - 使用新API接口')
       
-      // 应该输出 '/analysis-api/upload'
       if (!this.recordingConfirmed || this.isAnalyzing) return
       
       this.isAnalyzing = true
@@ -1931,75 +1973,48 @@ export default {
         const response = await fetch(this.recordedVideoUrl)
         const videoBlob = await response.blob()
         
-        // 如果是WebM格式，转换为MP4（简化版本）
-        let videoFileForAPI = videoBlob
-        if (videoBlob.type.includes('webm')) {
-          videoFileForAPI = new File([videoBlob], 'video.mp4', { type: 'video/mp4' })
-        }
+        // 创建FormData对象
+        const formData = new FormData()
+        formData.append('file', videoBlob, 'video.mp4')
         
-        // 上传视频
-        console.log('🔍 [DEBUG] 构建上传URL前的 apiBaseUrl:', this.apiBaseUrl)
-        const uploadUrl = `${this.apiBaseUrl}/upload`
-        console.log('🔍 [DEBUG] 构建的上传URL:', uploadUrl)
-        console.log('🔍 [DEBUG] 上传URL是否包含IP:', uploadUrl.includes('10.120.48.67'))
-        console.log('🔍 [DEBUG] 上传URL是否包含analysis-api:', uploadUrl.includes('analysis-api'))
-        console.log('🔍 [DEBUG] 完整的请求配置:', {
-          url: uploadUrl,
-          method: 'POST',
-          contentType: videoFileForAPI.type,
-          fileSize: videoFileForAPI.size
+        console.log('🔍 [DEBUG] 准备发送视频到新API接口')
+        console.log('🔍 [DEBUG] 视频文件大小:', this.formatFileSize(videoBlob.size))
+        console.log('🔍 [DEBUG] 视频文件类型:', videoBlob.type)
+        
+        // 使用新的API接口进行焦虑分析
+        const apiUrl = 'http://10.120.48.67:5000/api/predict_from_video'
+        console.log('🔍 [DEBUG] 发送请求到:', apiUrl)
+        
+        const analysisResponse = await axios.post(apiUrl, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 60000 // 60秒超时
         })
-    
-    // 上传视频
-        console.log('🔍 [DEBUG] 即将发送axios.post请求到:', uploadUrl)
-        const uploadResponse = await axios.post(
-          uploadUrl, 
-          videoFileForAPI,
-          {
-            headers: {
-              'Content-Type': videoFileForAPI.type
-            }
-          }
-        )
-        console.log('🔍 [DEBUG] 上传响应:', uploadResponse.data)
-        if (uploadResponse.data.code !== 0) {
-          throw new Error(`上传失败: ${uploadResponse.data.error_message || '未知错误'}`)
+        
+        console.log('🔍 [DEBUG] API响应:', analysisResponse.data)
+        
+        if (!analysisResponse.data.success) {
+          throw new Error('API分析失败: ' + (analysisResponse.data.message || '未知错误'))
         }
         
-        const videoId = uploadResponse.data.video_id
-        this.analysisProgress = 50
+        // 更新进度到100%
+        this.analysisProgress = 100
         
-        // 获取分析结果
-        let detectionResponse
-        let retryCount = 0
-        const maxRetries = 6
-        
-        while (retryCount < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          
-          detectionResponse = await axios.get(
-            `${this.apiBaseUrl}/detection?video_id=${videoId}`
-          )
-          
-          if (detectionResponse.data.code === 0 && detectionResponse.data.status === "finished") {
-            this.analysisProgress = 100
-            break
-          }
-          
-          this.analysisProgress = 50 + ((retryCount + 1) / maxRetries) * 40
-          retryCount++
-        }
-        
-        if (!detectionResponse || detectionResponse.data.code !== 0) {
-          throw new Error('获取分析结果失败')
-        }
-        
+        // 处理新的响应格式
+        const responseData = analysisResponse.data
         this.anxietyResult = {
-          score100: detectionResponse.data.score100,
-          category: detectionResponse.data.category
+          anxiety_level: responseData.anxiety_level,
+          confidence_score: responseData.confidence_score,
+          processing_time: responseData.processing_time,
+          text_extracted: responseData.text_extracted,
+          prediction: responseData.prediction,
+          probabilities: responseData.probabilities
         }
         
         this.analysisTime = new Date().toLocaleString()
+        
+        console.log('✅ 焦虑分析完成:', this.anxietyResult)
         
         // 触发分析完成事件
         this.$emit('analysisComplete', {
@@ -2009,7 +2024,7 @@ export default {
         })
         
       } catch (error) {
-        console.error('焦虑分析失败:', error)
+        console.error('❌ 焦虑分析失败:', error)
         this.anxietyResult = {
           error: true,
           message: error.message || '分析失败，请重试'
@@ -2593,11 +2608,23 @@ export default {
 </script>
 
 <style scoped>
+/* 确保页面可以正常滚动 */
+html, body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: auto;
+  min-height: 100vh;
+}
 /* 基础容器 */
 .container {
   padding: 20px;
   background: #f8f9fa;
   min-height: 100vh;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
 
 /* 错误消息 */
@@ -2702,6 +2729,10 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  position: relative;
+  z-index: 2;
+  padding-top: 0;
+  padding-bottom: 40px;
 }
 
 /* 卡片行 */
@@ -2729,6 +2760,9 @@ export default {
   display: flex;
   flex-direction: column;
   height: 600px;
+  position: relative;
+  z-index: 3;
+  overflow: visible;
 }
 
 .feature-card:hover {
@@ -3129,16 +3163,34 @@ export default {
   position: relative;
 }
 
-.score-circle.level-low {
-  background: linear-gradient(135deg, #4CAF50, #8BC34A);
+.score-circle.level-excellent {
+  background: linear-gradient(135deg, #00C851, #00A041);
+  box-shadow: 0 4px 20px rgba(0, 200, 81, 0.3);
+}
+
+.score-circle.level-good {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
 }
 
 .score-circle.level-medium {
-  background: linear-gradient(135deg, #FF9800, #FFC107);
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+  box-shadow: 0 4px 20px rgba(255, 152, 0, 0.3);
 }
 
-.score-circle.level-high {
-  background: linear-gradient(135deg, #F44336, #FF5722);
+.score-circle.level-warning {
+  background: linear-gradient(135deg, #FF5722, #E64A19);
+  box-shadow: 0 4px 20px rgba(255, 87, 34, 0.3);
+}
+
+.score-circle.level-danger {
+  background: linear-gradient(135deg, #F44336, #D32F2F);
+  box-shadow: 0 4px 20px rgba(244, 67, 54, 0.3);
+}
+
+.score-circle.level-unknown {
+  background: linear-gradient(135deg, #9E9E9E, #757575);
+  box-shadow: 0 4px 20px rgba(158, 158, 158, 0.3);
 }
 
 .score-value {
@@ -3168,16 +3220,34 @@ export default {
   font-weight: 600;
 }
 
-.level-badge.level-low {
+.level-badge.level-excellent {
+  background: #00C851;
+  box-shadow: 0 2px 8px rgba(0, 200, 81, 0.3);
+}
+
+.level-badge.level-good {
   background: #4CAF50;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .level-badge.level-medium {
   background: #FF9800;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
 }
 
-.level-badge.level-high {
+.level-badge.level-warning {
+  background: #FF5722;
+  box-shadow: 0 2px 8px rgba(255, 87, 34, 0.3);
+}
+
+.level-badge.level-danger {
   background: #F44336;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+}
+
+.level-badge.level-unknown {
+  background: #9E9E9E;
+  box-shadow: 0 2px 8px rgba(158, 158, 158, 0.3);
 }
 
 .description {
@@ -3325,6 +3395,53 @@ export default {
   .score-circle {
     align-self: center;
   }
+  
+  /* 焦虑分析响应式设计 */
+  .anxiety-header {
+    padding: 12px 16px;
+  }
+  
+  .header-info {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .analysis-title {
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .status-indicator {
+    margin-left: 0;
+  }
+  
+  .anxiety-score-section {
+    flex-direction: column;
+    text-align: center;
+    gap: 20px;
+    padding: 20px 16px;
+  }
+  
+  .anxiety-score-circle {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .score-value {
+    font-size: 24px;
+  }
+  
+  .anxiety-recommendations {
+    padding: 16px;
+  }
+  
+  .anxiety-footer {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+    padding: 12px 16px;
+  }
 }
 
 /* 动画增强 */
@@ -3353,6 +3470,256 @@ export default {
 
 .feature-card:nth-child(4) {
   animation-delay: 0.3s;
+}
+
+/* 焦虑分析结果 - 优化后的样式 */
+.anxiety-result-container {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 简洁的头部信息 */
+.anxiety-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 16px 20px;
+  color: white;
+}
+
+.header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.analysis-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analysis-title i {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.analysis-title span {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.2);
+  margin-left: 10px;
+}
+
+.confidence-display {
+  text-align: right;
+}
+
+.confidence-label {
+  display: block;
+  font-size: 11px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.confidence-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 主要内容区域 */
+.anxiety-main-content {
+  padding: 0;
+}
+
+/* 分数和状态展示 */
+.anxiety-score-section {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 20px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+}
+
+.anxiety-score-circle {
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.anxiety-score-circle.level-excellent {
+  background: linear-gradient(135deg, #00C851, #00A041);
+}
+
+.anxiety-score-circle.level-good {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+}
+
+.anxiety-score-circle.level-medium {
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+}
+
+.anxiety-score-circle.level-warning {
+  background: linear-gradient(135deg, #FF5722, #E64A19);
+}
+
+.anxiety-score-circle.level-danger {
+  background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+.score-inner {
+  text-align: center;
+}
+
+.score-value {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-label {
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+.anxiety-status-info {
+  flex: 1;
+}
+
+.anxiety-level {
+  margin-bottom: 12px;
+}
+
+.anxiety-level-text {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.anxiety-level-text.level-excellent {
+  background: linear-gradient(135deg, #00C851, #00A041);
+}
+
+.anxiety-level-text.level-good {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+}
+
+.anxiety-level-text.level-medium {
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+}
+
+.anxiety-level-text.level-warning {
+  background: linear-gradient(135deg, #FF5722, #E64A19);
+}
+
+.anxiety-level-text.level-danger {
+  background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+.anxiety-description {
+  margin: 0;
+  color: #555;
+  line-height: 1.5;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* 建议区域 */
+.anxiety-recommendations {
+  background: #f8f9fa;
+  padding: 20px;
+  border-top: 1px solid #e9ecef;
+}
+
+.recommendations-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.recommendations-header i {
+  color: #FFC107;
+  font-size: 16px;
+}
+
+.recommendations-header h4 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.anxiety-tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.anxiety-tip-item {
+  background: white;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 3px solid #4CAF50;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #555;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.anxiety-tip-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 底部信息 */
+.anxiety-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  color: #666;
+  font-size: 11px;
+}
+
+.analysis-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analysis-time i {
+  color: #999;
+}
+
+.analysis-details {
+  color: #999;
 }
 
 /* 滚动条美化 */

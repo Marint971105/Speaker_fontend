@@ -835,9 +835,8 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 15px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
 }
 
 .content-wrapper {
@@ -903,23 +902,30 @@ export default {
 }
 
 .result-display {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: transparent;
+  border-radius: 0;
+  padding: 12px;
 }
 
 .emotion-summary {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .primary-emotion {
   display: flex;
   align-items: center;
-  gap: 15px;
-  background: #f8f9fa;
-  padding: 20px;
+  gap: 16px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  padding: 16px;
   border-radius: 12px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .emotion-icon {
@@ -965,16 +971,26 @@ export default {
 }
 
 .emotion-chart {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
 }
 
 .emotion-chart h4 {
-  margin: 0 0 15px 0;
+  margin: 0 0 12px 0;
   color: #2c3e50;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  
+  i {
+    font-size: 14px;
+    color: #409EFF;
+  }
 }
 
 .emotion-bars {
@@ -1024,31 +1040,46 @@ export default {
 }
 
 .emotion-timeline {
-  margin-bottom: 20px;
+  margin-bottom: 0;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
 }
 
 .emotion-timeline h4 {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
   color: #2c3e50;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  
+  i {
+    font-size: 14px;
+    color: #409EFF;
+  }
 }
 
 .timeline-info {
-  background: #f8f9fa;
+  display: flex;
+  gap: 16px;
+  background: white;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .timeline-info p {
-  margin: 0 0 5px 0;
+  margin: 0;
   font-size: 12px;
   color: #666;
-}
-
-.timeline-info p:last-child {
-  margin-bottom: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
 }
 </style> 

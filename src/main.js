@@ -7,6 +7,7 @@ import './assets/styles/element-variables.scss'
 
 import '@/assets/styles/index.scss' // global css
 import '@/assets/styles/ruoyi.scss' // ruoyi css
+import '@/assets/styles/login-fix.scss' // login page button fix for production
 import App from './App'
 import store from './store'
 import router from './router'

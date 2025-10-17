@@ -1,78 +1,90 @@
 <template>
   <div class="login">
-    <div class="overlay"></div> <!-- 添加这一行 -->
-    <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
-<!--      <h3 class="title">言之"邮"理</h3>-->
-<!--      <h3 class="title">研究生演讲能力智能评价系统</h3>-->
-      <img src="@/assets/logo/logo4.png" alt="Utalk Logo" class="logo-img">
-      <el-form-item prop="username">
-        <el-input
-          v-model="loginForm.username"
-          type="text"
-          auto-complete="off"
-          placeholder="账号"
-          class="input-custom"
-        >
-          <svg-icon slot="prefix" icon-class="user" class="el-input__icon input-icon" />
-        </el-input>
-      </el-form-item>
-      <el-form-item prop="password">
-        <el-input
-          v-model="loginForm.password"
-          type="password"
-          auto-complete="off"
-          placeholder="密码"
-          @keyup.enter.native="handleLogin"
-          class="input-custom"
-        >
-          <svg-icon slot="prefix" icon-class="password" class="el-input__icon input-icon" />
-        </el-input>
-      </el-form-item>
-<!--      <el-form-item prop="code" v-if="captchaEnabled">-->
-<!--        <el-input-->
-<!--          v-model="loginForm.code"-->
-<!--          auto-complete="off"-->
-<!--          placeholder="验证码"-->
-<!--          style="width: 63%"-->
-<!--          @keyup.enter.native="handleLogin"-->
-<!--        >-->
-<!--          <svg-icon slot="prefix" icon-class="validCode" class="el-input__icon input-icon" />-->
-<!--        </el-input>-->
-<!--        <div class="login-code">-->
-<!--          <img :src="codeUrl" @click="getCode" class="login-code-img"/>-->
-<!--        </div>-->
-<!--      </el-form-item>-->
-      <el-checkbox v-model="loginForm.rememberMe" style="margin:0px 0px 25px 0px;" class="checkbox-custom" >记住密码</el-checkbox>
-      <el-form-item style="width:100%;">
+    <div class="overlay"></div>
+    
+    <!-- 双卡片容器 -->
+    <div class="cards-container">
+      <!-- 左侧：原有的登录卡片 -->
+      <div class="login-card-container">
+        <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
+        <img src="@/assets/logo/logo4.png" alt="Utalk Logo" class="logo-img">
+        <el-form-item prop="username">
+          <el-input
+            v-model="loginForm.username"
+            type="text"
+            auto-complete="off"
+            placeholder="账号"
+            class="input-custom"
+          >
+            <svg-icon slot="prefix" icon-class="user" class="el-input__icon input-icon" />
+          </el-input>
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            auto-complete="off"
+            placeholder="密码"
+            @keyup.enter.native="handleLogin"
+            class="input-custom"
+          >
+            <svg-icon slot="prefix" icon-class="password" class="el-input__icon input-icon" />
+          </el-input>
+        </el-form-item>
+        <el-checkbox v-model="loginForm.rememberMe" class="checkbox-custom">记住密码</el-checkbox>
+      </el-form>
+      
+      <!-- 将按钮移到 el-form 外部，避免 Element UI 样式干扰 -->
+      <div class="login-buttons-wrapper">
         <el-button
           :loading="loading"
           size="medium"
           type="primary"
-          style="width:100%;"
           @click.native.prevent="handleLogin"
           class="login-button"
         >
           <span v-if="!loading">登 录</span>
           <span v-else>登 录 中...</span>
         </el-button>
-        <!-- 添加统一认证按钮 -->
         <el-button
           size="medium"
           type="primary"
-          style="width:100%; margin-top: 15px;"
           @click="handleCasLogin"
           class="login-button cas-button"
         >
-          统一认证登录
+          北京邮电大学统一认证登录
         </el-button>
-        <div style="float: right;" v-if="register">
+      </div>
+      
+        <div class="register-link-wrapper" v-if="register">
           <router-link class="link-type" :to="'/register'">立即注册</router-link>
         </div>
-      </el-form-item>
-    </el-form>
-    <!--  底部  -->
+      </div>
+      
+      <!-- 右侧：多智能体登录卡片 -->
+      <div class="agent-card">
+        <img src="@/assets/logo/agentlogo2.png" alt="智能语伴" class="logo-img agent-logo">
+        <div class="agent-description">
+          <div class="agent-intro">
+            <p class="intro-main">
+              集<span class="highlight">视频智析</span>、<span class="highlight">语音评鉴</span>、<span class="highlight">文稿智写</span>、<span class="highlight">PPT智检</span>
+            </p>
+            <p class="intro-slogan">
+              深度赋能公众表达与写作沟通
+            </p>
+          </div>
+        </div>
+        <el-button
+          size="medium"
+          type="primary"
+          class="login-button agent-button"
+          @click="handleAgentLogin"
+        >
+          立即体验
+        </el-button>
+      </div>
+    </div>
   </div>
-
 </template>
 
 <script>
@@ -191,6 +203,10 @@ export default {
       console.log('编码前service:', 'https://123.56.183.160:8081/cas/callback')
       console.log('编码后service:', serviceUrl)
       window.location.href = `${casLoginUrl}?service=${serviceUrl}`
+    },
+    // 添加多智能体系统跳转方法
+    handleAgentLogin() {
+      window.open('https://u2757646-bba3-60bbb321.nmb1.seetacloud.com:8443/', '_blank')
     }
   }
 };
@@ -202,17 +218,33 @@ export default {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-end;
-  //height: 100vh;
+  align-items: center;
   background-image: url("../assets/buptshitang.jpg");
   background-position: center;
   background-repeat: no-repeat;
-  background-size: cover;  /* 设置宽度100%，高度100vh */
+  background-size: cover;
   font-family: 'Poppins', sans-serif;
   position: relative;
-  padding-right: 15%;
-  min-height: 100vh; // 添加最小高度
-  height: auto; // 允许高度自适应
+  min-height: 100vh;
+  height: auto;
+  padding: 2rem;
+}
+
+/* 双卡片容器 */
+.cards-container {
+  display: flex;
+  gap: 10rem;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 1200px;
+  width: 100%;
+  z-index: 2;
+  
+  @media (max-width: 1200px) {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
 .title {
@@ -229,17 +261,43 @@ export default {
 .el-form-item {
   margin-bottom: 25px;  /* 增加表单项之间的间距 */
 }
-.login-form {
-  position: relative; /* 保证模糊层叠加在正确位置 */
+/* 左侧登录卡片整体容器 - 统一的卡片样式 */
+.login-card-container {
+  position: relative;
   z-index: 2;
-  background: #ffffff;  /* 纯白色背景 */ /* 添加透明背景 */
-  //backdrop-filter: blur(5px); /* 背景模糊 */
+  background: #ffffff;
   padding: 3rem;
-  border-radius: 8px;
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2); /* 添加阴影效果 */
-  //width: 500px; /* 调整宽度 */
-  width: min(500px, 90%); // 使用min函数,最大500px,最小90%视窗宽度
-  max-width: 500px; // 设置最大宽度
+  border-radius: 12px;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 500px;
+  flex: 1;
+  min-width: 400px;
+  
+  @media (max-width: 768px) {
+    min-width: 300px;
+    padding: 2rem;
+  }
+}
+
+/* 表单本身不需要额外样式 */
+.login-form {
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+/* 按钮容器 */
+.login-buttons-wrapper {
+  margin-top: 0;
+  padding: 0;
+}
+
+/* 注册链接容器 */
+.register-link-wrapper {
+  text-align: right;
+  margin-top: 15px;
+  padding: 0;
 }
 .overlay {
   position: absolute;
@@ -275,64 +333,92 @@ export default {
   color: #606266;
   background-color: #fff;
   border-radius: 5px;
-  height: 3rem;  /* 增加输入框高度 */
+  height: 3rem !important;  /* 增加输入框高度 */
   font-size: 1rem;  /* 适当增加字体大小 */
-  padding-left: 3rem;  /* 给图标留出足够空间 */
-  line-height: 45px;
+  padding-left: 3rem !important;  /* 给图标留出足够空间 */
+  line-height: 3rem !important;  /* 与高度一致，确保文字垂直居中 */
 }
 
 .input-custom .el-input__inner::placeholder {
   color: #909399;
+  line-height: 3rem !important;
 }
 
 .checkbox-custom {
   color: #606266;
-  margin:  1rem 0 2rem 0;  /* 调整复选框上下间距 */
+  margin: 0 0 25px 0;
   font-size: 1rem;
-
 }
 
-.login-button {
-  background: linear-gradient(135deg, #8BB174, #0072BD);  /* 修改为BUPT标志的绿色到蓝色渐变 */
-  border: none;
-  color: #FFF;
-  font-weight: bold;
-  transition: all 0.3s;
-  width: 100%;
-  margin:  1rem 0 2rem 0;  /* 调整复选框上下间距 */
-  font-size: 1rem;
-
-}
-
-.login-button:hover {
-  background: linear-gradient(135deg, #0072BD, #8BB174);  /* 悬停时反转渐变方向 */
-  transform: scale(1.05); /* 悬停时放大效果 */
+/* 按钮样式 - 完全脱离 Element UI 控制 */
+.login-buttons-wrapper {
+  .login-button {
+    background: linear-gradient(135deg, #8BB174, #0072BD) !important;
+    border: none !important;
+    color: #FFF !important;
+    font-weight: 600;
+    transition: all 0.3s;
+    width: 100% !important;
+    height: 48px !important;
+    font-size: 16px !important;
+    letter-spacing: 1px;
+    margin: 0 0 15px 0 !important;
+    padding: 0 20px !important;
+    text-align: center !important;
+    display: block !important;
+    cursor: pointer;
+    border-radius: 4px;
+    
+    &:last-child {
+      margin-bottom: 0 !important;
+    }
+    
+    &:hover {
+      background: linear-gradient(135deg, #0072BD, #8BB174) !important;
+      transform: scale(1.02);
+      box-shadow: 0 6px 20px rgba(139, 177, 116, 0.4);
+    }
+  }
+  
+  .cas-button {
+    background: linear-gradient(135deg, #0072BD, #8BB174) !important;
+    
+    &:hover {
+      background: linear-gradient(135deg, #8BB174, #0072BD) !important;
+      box-shadow: 0 6px 20px rgba(0, 114, 189, 0.4);
+    }
+  }
 }
 
 /* 调整图标容器位置 */
 .el-input__prefix {
-  display: flex;
-  align-items: center;
-  height: 100%;
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
 }
+
 .input-icon {
-  height: 100%;
-  width: 20px;  /* 设置合适的图标宽度 */
-  margin-left: 8px;  /* 给图标左边留出一些空间 */
+  height: 100% !important;
+  width: 20px !important;  /* 设置合适的图标宽度 */
+  margin-left: 8px !important;  /* 给图标左边留出一些空间 */
   vertical-align: middle;
-  display: flex;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .el-input__icon {
-  line-height: 45px;  /* 与输入框高度相同 */
-  height: 45px;
+  line-height: 3rem !important;  /* 与输入框高度相同 */
+  height: 3rem !important;
 }
 
 /* 调整svg图标容器 */
 .svg-icon {
-  height: 20px;
-  width: 20px;
+  height: 20px !important;
+  width: 20px !important;
   vertical-align: middle;
 }
 .logo-img {
@@ -341,12 +427,117 @@ export default {
   display: block;  /* 块级元素以便使用margin auto居中 */
 }
 
-.cas-button {
-  background: linear-gradient(135deg, #0072BD, #8BB174) !important;  // 可以稍微改变渐变方向区分两个按钮
+
+/* 多智能体卡片样式 */
+.agent-card {
+  position: relative;
+  z-index: 2;
+  background: #ffffff;
+  padding: 3rem;
+  border-radius: 12px;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 500px;
+  flex: 1;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;  /* 改为顶部对齐，不使用space-between */
   
-  &:hover {
-    background: linear-gradient(135deg, #8BB174, #0072BD) !important;
-    transform: scale(1.05);
+  @media (max-width: 768px) {
+    min-width: 300px;
+    padding: 2rem;
   }
 }
+
+.agent-logo {
+  margin-bottom: 1rem !important;  /* 减少logo下方间距 */
+}
+
+.agent-description {
+  flex: 0;  /* 不占用弹性空间 */
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 0;
+  min-height: 270px;  /* 设置最小高度以对齐按钮 */
+}
+
+.agent-intro {
+  background: transparent;
+  padding: 0;
+  text-align: center;
+  padding-top: 4rem;
+  margin-bottom: 0;
+}
+
+.intro-main {
+  color: #2c3e50;
+  font-size: 19px;
+  line-height: 1.6;
+  margin: 0 0 2.5rem 0;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  
+  .highlight {
+    color: #007BFF;  /* 修改为指定颜色 */
+    font-weight: 700;
+    font-size: 19px;  /* 从22px缩小到17px */
+    padding: 0 2px;
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 1px;
+      left: 0;
+      right: 0;
+      height: 6px;  /* 减小高亮条高度 */
+      background: linear-gradient(135deg, rgba(0, 123, 255, 0.2), rgba(0, 114, 189, 0.2));  /* 调整渐变颜色以匹配 */
+      z-index: -1;
+      border-radius: 3px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    white-space: normal;  /* 小屏幕允许换行 */
+    font-size: 14px;
+    
+    .highlight {
+      font-size: 15px;
+    }
+  }
+}
+
+.intro-slogan {
+  color: #007AFF;  /* 修改为指定颜色 */
+  font-size: 25px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0;  /* 完全移除底部间距 */
+  letter-spacing: 2px;
+  line-height: 1.5;
+}
+
+.agent-button {
+  background: linear-gradient(135deg, #409EFF, #0072BD) !important;
+  margin-top: 0 !important;  /* 紧跟文字内容 */
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  flex-shrink: 0;  /* 防止按钮被压缩 */
+  
+  &:hover {
+    background: linear-gradient(135deg, #0072BD, #409EFF) !important;
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.4);
+  }
+}
+
+
 </style>
