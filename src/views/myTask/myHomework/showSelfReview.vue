@@ -14,7 +14,7 @@
 
     <!-- 顶部标签页 -->
     <el-tabs v-model="activeTab" type="card" class="tabs-container">
-      <el-tab-pane v-for="type in submissionTypes" :key="type" :name="type" :label="type">
+      <el-tab-pane v-for="type in submissionTypes" :key="type" :name="type" :label="getDisplayName(type)">
         <div v-if="type === '视频'" class="tab-content">
           <!-- 第一行：视频和评分维度 -->
           <div class="first-row">
@@ -360,7 +360,7 @@
                   <!-- 评分总分和按钮 -->
                   <div class="score-submit">
                     <div class="score-container">
-                      <span class="score-label">演讲稿总分：</span>
+                      <span class="score-label">文稿总分：</span>
                       <el-input class="score-input" :value="calculateTotalScore('word')" readonly></el-input>
                       <span class="score-unit">分</span>
                     </div>
@@ -385,6 +385,8 @@ import mammoth from 'mammoth';
 import PdfViewer from './PDFViewer.vue'
 import {getSubmissionInfoById} from "@/api/myTask/myHomework/machineEvaluation";
 import {getEvaluationByTaskIdAndStuId} from "@/api/myTask/myEvaluation/index";
+import { mapGetters } from 'vuex';
+
 export default {
   name: "showselfReview",
   directives: {
@@ -469,6 +471,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters(['userId']),
     // 计算雷达图所需的数据
     radarData() {
       return this.submissionTypes.map(type => {
@@ -513,7 +516,18 @@ export default {
     // 获取任务信息
     async fetchTaskData() {
       try {
-        const res = await getEvaluationByTaskIdAndStuId(this.taskId, this.taskDetails.ownerId);
+        // 获取学生ID（从submitId对应的StudentSubmission中获取，或使用当前登录用户ID）
+        let studentId = this.userId;
+        try {
+          const submissionInfo = await getSubmissionInfoById(this.submitId);
+          if (submissionInfo?.data?.studentId) {
+            studentId = submissionInfo.data.studentId;
+          }
+        } catch (error) {
+          console.warn('获取提交信息失败，使用当前登录用户ID:', error);
+        }
+
+        const res = await getEvaluationByTaskIdAndStuId(this.taskId, studentId);
 
         if (!res?.data?.evaluationTypes) {
           this.$message.error('获取评价数据失败');
@@ -816,7 +830,23 @@ export default {
       this.isPlaying = false;
     },
 
+    // 格式化创建时间
+    formatCreateTime(createTime) {
+      if (!createTime) return '';
+      const date = new Date(createTime);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    },
 
+    // 获取显示名称，将"演讲稿"显示为"文稿"
+    getDisplayName(type) {
+      return type === '演讲稿' ? '文稿' : type;
+    },
 
   },
   async created() {

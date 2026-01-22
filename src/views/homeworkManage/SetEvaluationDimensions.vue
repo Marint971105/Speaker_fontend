@@ -62,13 +62,17 @@
           >
             <!-- 评价维度标题区域 -->
             <div class="dimension-title-area">
-              <div class="dimension-title">评价维度 {{ index + 1 }}</div>
-              <div class="dimension-input-group">
+              <div class="dimension-title-left" @click.stop="toggleDimension(type, index)">
+                <i 
+                  :class="['el-icon-arrow-down', 'expand-icon', { 'expanded': isDimensionExpanded(type, index) }]"
+                ></i>
+              </div>
+              <div class="dimension-input-group" @click.stop>
                 <el-input
                   v-model="dimension.evaluationTitle"
                   :disabled="activeMethod === '机评'"
                   size="small"
-                  placeholder="请输入评价维度标题"
+                  placeholder="请输入标题"
                 >
                 </el-input>
                 <el-button
@@ -76,14 +80,17 @@
                   type="text"
                   icon="el-icon-delete"
                   class="delete-btn"
-                  @click="removeDimension(type, index)"
+                  @click.stop="removeDimension(type, index)"
                 ></el-button>
               </div>
             </div>
 
-            <!-- 评价点列表 -->
-            <div class="points-container">
-              <div class="points-title">评价点</div>
+            <!-- 评价维度列表 - 可折叠 -->
+            <div 
+              v-show="isDimensionExpanded(type, index)"
+              class="points-container"
+            >
+              <div class="points-title">评价维度</div>
               <div class="points-list">
                 <div
                   v-for="(point, pIndex) in dimension.evaluationInfos"
@@ -94,7 +101,7 @@
                     v-model="dimension.evaluationInfos[pIndex]"
                     :disabled="activeMethod === '机评'"
                     size="small"
-                    placeholder="请输入评价点描述"
+                    placeholder="请输入评价维度描述"
                   >
                   </el-input>
                   <el-button
@@ -107,7 +114,7 @@
                 </div>
               </div>
 
-              <!-- 添加评价点按钮 -->
+              <!-- 添加评价维度按钮 -->
               <el-button
                 v-if="activeMethod !== '机评'"
                 type="text"
@@ -115,7 +122,7 @@
                 class="add-btn add-point-btn"
                 @click="addPoint(dimension)"
               >
-                <i class="el-icon-plus"></i> 添加评价点
+                <i class="el-icon-plus"></i> 添加评价维度
               </el-button>
             </div>
           </div>
@@ -139,7 +146,7 @@
 <script>
 import _ from 'lodash'
 import defaultTemplate from './defaultTemplate'
-import { setTaskEvaluation } from '@/api/homeworkManage/assignTask'
+import { setTaskEvaluation, getTaskInfoById } from '@/api/homeworkManage/assignTask'
 
 export default {
   name: 'SetEvaluationDimensions',
@@ -148,6 +155,10 @@ export default {
     taskId: {
       type: String,
       required: true
+    },
+    hasAssignedStudents: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -157,22 +168,56 @@ export default {
       activeMethod: '师评',
       evaluationMethods: ['师评', '互评', '自评', '机评'],
       modalTypes: ['视频', '音频', 'PPT', '演讲稿'],
-      evaluationData: []
+      evaluationData: [],
+      hasAutoAppliedTemplate: false, // 标记是否已自动应用基础模板
+      expandedDimensions: {} // 存储每个评价维度的展开状态，格式：{ 'type-method-index': true/false }
     }
   },
 
   created() {
     this.initializeData()
   },
+  
+  watch: {
+    // 监听是否有学生分配，如果有学生分配且没有评价维度数据，自动应用基础模板
+    async hasAssignedStudents(newVal) {
+      if (newVal && !this.hasAutoAppliedTemplate) {
+        // 检查是否已有评价维度数据（从后端获取）
+        try {
+          const taskResponse = await getTaskInfoById(this.taskId)
+          if (taskResponse && taskResponse.data && taskResponse.data.evaluationDimensions && 
+              Array.isArray(taskResponse.data.evaluationDimensions) && 
+              taskResponse.data.evaluationDimensions.length > 0) {
+            // 如果后端已有评价维度数据，不自动应用
+            return
+          }
+        } catch (error) {
+          console.error('检查评价维度数据失败:', error)
+        }
+        
+        // 检查本地存储
+        const stored = localStorage.getItem(`evaluation_${this.taskId}`)
+        if (!stored) {
+          // 如果没有存储的评价维度数据，自动应用基础模板（会自动提交）
+          this.hasAutoAppliedTemplate = true
+          await this.applyBasicTemplate()
+        }
+      }
+    }
+  },
 
   methods: {
     // 初始化数据
-    initializeData() {
+    async initializeData() {
       const stored = localStorage.getItem(`evaluation_${this.taskId}`)
       if (stored) {
         this.evaluationData = JSON.parse(stored)
       } else {
-        this.applyTemplate('basic')
+        // 如果有学生分配，自动应用基础模板；否则等待学生分配后再应用
+        if (this.hasAssignedStudents && !this.hasAutoAppliedTemplate) {
+          this.hasAutoAppliedTemplate = true
+          await this.applyBasicTemplate()
+        }
       }
     },
 
@@ -185,12 +230,37 @@ export default {
       return modalType ? modalType.evaluationTitles : []
     },
 
+    // 获取评价维度的唯一键
+    getDimensionKey(type, index) {
+      return `${this.activeMethod}-${type}-${index}`
+    },
+
+    // 检查评价维度是否展开
+    isDimensionExpanded(type, index) {
+      const key = this.getDimensionKey(type, index)
+      // 默认折叠，如果已设置则使用设置的值
+      return this.expandedDimensions[key] === true
+    },
+
+    // 切换评价维度的展开/折叠状态
+    toggleDimension(type, index) {
+      const key = this.getDimensionKey(type, index)
+      this.$set(this.expandedDimensions, key, !this.expandedDimensions[key])
+    },
+
     // 应用模板
     // 直接应用基础模板
-    applyBasicTemplate() {
+    async applyBasicTemplate() {
       this.evaluationData = _.cloneDeep(defaultTemplate)
       this.saveToLocal()
-      this.$message.success('已应用基础模板')
+      // 自动应用基础模板后，自动提交
+      try {
+        await this.submitEvaluationDimensions()
+        // 提交成功消息在 submitEvaluationDimensions 中已显示
+      } catch (error) {
+        console.error('自动提交基础模板失败:', error)
+        this.$message.warning('已应用基础模板，但自动提交失败，请手动点击"提交"按钮')
+      }
     },
 // 开始自定义模板
     startCustomTemplate() {
@@ -452,22 +522,57 @@ export default {
 }
 
 .dimension-title-area {
-  margin-bottom: 16px;
-  border-bottom: 1px solid #ebeef5;
-  padding-bottom: 12px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #fafafa;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+  transition: background-color 0.2s;
+}
+
+.dimension-title-area:hover {
+  background-color: #f0f2f5;
+}
+
+.dimension-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+.expand-icon {
+  font-size: 14px;
+  color: #606266;
+  transition: transform 0.3s ease;
+  cursor: pointer;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.expand-icon:hover {
+  color: #409EFF;
 }
 
 .dimension-title {
   font-size: 14px;
   font-weight: 500;
   color: #303133;
-  margin-bottom: 8px;
+  user-select: none;
+  margin-bottom: 0;
 }
 
 .dimension-input-group {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
 }
 
 /* 评价点容器 */
@@ -532,25 +637,25 @@ export default {
 }
 
 /* Element UI 组件样式覆盖 */
-/deep/ .el-card__body {
+::v-deep .el-card__body {
   padding: 0;
   height: 100%;
 }
 
-/deep/ .el-input__inner {
+::v-deep .el-input__inner {
   font-size: 13px;
 }
 
-/deep/ .el-button--text {
+::v-deep .el-button--text {
   padding: 0;
 }
 
 /* 确保父组件不会限制宽度 */
-/deep/ .el-tabs__content {
+::v-deep .el-tabs__content {
   overflow: visible !important;
 }
 
-/deep/ .el-tab-pane {
+::v-deep .el-tab-pane {
   min-width: 1200px !important;
 }
 </style>

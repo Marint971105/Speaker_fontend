@@ -14,7 +14,7 @@
 
     <!-- 顶部标签页 -->
     <el-tabs v-model="activeTab" type="card" class="tabs-container">
-      <el-tab-pane v-for="type in submissionTypes" :key="type" :name="type" :label="type">
+      <el-tab-pane v-for="type in submissionTypes" :key="type" :name="type" :label="getDisplayName(type)">
         <div v-if="type === '视频'" class="tab-content">
           <!-- 第一行：视频和评分维度 -->
           <div class="first-row">
@@ -483,7 +483,7 @@
                   <!-- 评分总分和按钮 -->
                   <div class="score-submit">
                     <div class="score-container">
-                      <span class="score-label">演讲稿总分：</span>
+                      <span class="score-label">文稿总分：</span>
                       <el-input class="score-input" :value="calculateTotalScore('word')" readonly></el-input>
                       <span class="score-unit">分</span>
                     </div>
@@ -507,6 +507,8 @@ import * as echarts from 'echarts';
 import { Loading } from 'element-ui';
 import mammoth from 'mammoth';
 import PdfViewer from './PDFViewer.vue'
+import { mapGetters } from 'vuex';
+
 export default {
   name: "showmachineEvaluation",
   directives: {
@@ -523,7 +525,8 @@ export default {
     },
     taskDetails: {
       type: Object,
-      required: true,
+      required: false, // 改为非必需，支持从query参数获取
+      default: () => ({})
     }
   },
   data() {
@@ -597,6 +600,15 @@ export default {
     };
   },
   computed: {
+    ...mapGetters(['userId']),
+    // 从路由或props获取taskId
+    currentTaskId() {
+      return this.taskId || this.$route.query.taskId;
+    },
+    // 从路由或props获取submitId  
+    currentSubmitId() {
+      return this.submitId || this.$route.query.submitId;
+    },
     videoScore() {
       return this.calculateTotalScore('video')
     },
@@ -650,14 +662,37 @@ export default {
     // 获取任务信息
     async fetchTaskData() {
       try {
-        // 1. 获取评估数据
-        const res = await getEvaluationByTaskIdAndStuId(this.taskId, this.taskDetails.ownerId);
+        // 如果没有taskDetails或ownerId，先获取任务信息
+        if (!this.taskDetails.ownerId) {
+          const taskInfo = await getTaskInfoById(this.currentTaskId);
+          if (taskInfo?.data) {
+            // 更新taskDetails
+            Object.assign(this.taskDetails, taskInfo.data);
+          } else {
+            this.$message.error('获取任务信息失败');
+            return;
+          }
+        }
+
+        // 1. 获取学生ID（从submitId对应的StudentSubmission中获取，或使用当前登录用户ID）
+        let studentId = this.userId;
+        try {
+          const submissionInfo = await getSubmissionInfoById(this.currentSubmitId);
+          if (submissionInfo?.data?.studentId) {
+            studentId = submissionInfo.data.studentId;
+          }
+        } catch (error) {
+          console.warn('获取提交信息失败，使用当前登录用户ID:', error);
+        }
+
+        // 2. 获取评估数据（使用学生ID，而不是教师ID）
+        const res = await getEvaluationByTaskIdAndStuId(this.currentTaskId, studentId);
         if (!res?.data) {
           this.$message.error('获取评估信息失败');
           return;
         }
 
-        // 2. 找到机评数据
+        // 3. 找到机评数据
         const machineEvaluation = res.data.evaluationTypes.find(
           type => type.evaluationMethod === "机评"
         );
@@ -667,7 +702,7 @@ export default {
           return;
         }
 
-        // 3. 处理可用的提交类型（按固定顺序过滤）
+        // 4. 处理可用的提交类型（按固定顺序过滤）
         const finishedContents = machineEvaluation.evaluationContents.filter(
           content => content.finished
         );
@@ -675,7 +710,7 @@ export default {
           type => finishedContents.some(content => content.evaluationContent === type)
         );
 
-        // 4. 初始化评估数据结构
+        // 5. 初始化评估数据结构
         this.evaluationData = {
           // 视频部分只保留固定的evaluationInfos
           video: [{
@@ -688,7 +723,7 @@ export default {
           }]
         };
 
-        // 5. 初始化ratings和comments
+        // 6. 初始化ratings和comments
         this.ratings = {
           video: [[0]],
           audio: [],
@@ -849,11 +884,14 @@ export default {
     calculateTotalScore(type) {
       // 获取接口返回的总分
       let score = this.totalScores[type] || 0;
-      if (type === 'audio' && score !== null) {
-        // 把0-5分映射到0-100分，并提高分数
-        score = score * 20 + 10;
-        // 确保分数不超过100且为整数
-        score = Math.min(Math.round(score), 100);
+      if (type === 'audio' && score !== null && score !== undefined) {
+        // 音频：直接使用后端返回的分数（0-100分制），确保为整数且在0-100之间
+        score = Math.min(Math.max(Math.round(score), 0), 100);
+      } else if (score !== null && score !== undefined) {
+        // 其他类型：确保分数为整数，范围在0-100之间
+        score = Math.min(Math.max(Math.round(score), 0), 100);
+      } else {
+        score = 0;
       }
       // 找到对应的中文类型
       const chineseType = Object.keys(this.typeMapping).find(key =>
@@ -992,7 +1030,7 @@ export default {
 
     async loadFiles() {
       try {
-        const {data} = await getSubmissionInfoById(this.submitId);
+        const {data} = await getSubmissionInfoById(this.currentSubmitId);
         if (!data?.taskInfos?.length) {
           throw new Error('No submissions found');
         }
@@ -1097,6 +1135,11 @@ export default {
 
     handlePause(){
       this.isPlaying = false;
+    },
+
+    // 获取显示名称，将"演讲稿"显示为"文稿"
+    getDisplayName(type) {
+      return type === '演讲稿' ? '文稿' : type;
     },
 
     parseAudioComment(comment) {

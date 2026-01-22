@@ -16,10 +16,25 @@
           <div><strong>其中:</strong>
             视频 权重 {{ taskDetails.weights[0] }}%、
             音频 权重 {{ taskDetails.weights[1] }}%、
-            演讲稿 权重 {{ taskDetails.weights[2] }}%、
+            文稿 权重 {{ taskDetails.weights[2] }}%、
             PPT 权重 {{ taskDetails.weights[3] }}%
           </div>
           <div><strong>作业要求:</strong> {{ taskDetails.taskRequirements || '无' }}</div>
+          <!-- 作业附件 -->
+          <div v-if="taskDetails.attachmentFiles && taskDetails.attachmentFiles.length > 0" class="attachment-section">
+            <strong>作业附件:</strong>
+            <div class="attachment-list">
+              <div
+                v-for="(file, index) in taskDetails.attachmentFiles"
+                :key="index"
+                class="attachment-item"
+              >
+                <i class="el-icon-document"></i>
+                <span class="attachment-name">{{ getFileName(file) }}</span>
+                <el-button type="text" size="small" @click="downloadAttachment(file)">下载</el-button>
+              </div>
+            </div>
+          </div>
         </div>
       </el-collapse-transition>
     </el-card>
@@ -42,9 +57,33 @@
         <el-button
           type="primary"
           @click="submitAllFiles"
+          :disabled="isSubmitting || !hasPreviewFiles"
           size="large">
-          {{ isSubmitted ? '已提交' : (isSubmitting ? '提交中...' : '提交所有文件') }}
+          {{ isSubmitting ? '提交中...' : (hasPreviewFiles ? '提交所有文件' : '已提交') }}
         </el-button>
+      </div>
+
+      <!-- 评分状态显示 -->
+      <div v-if="pollingTimer" class="grading-status-section">
+        <el-card class="status-card">
+          <div class="status-header">
+            <i class="el-icon-loading" style="animation: rotate 2s linear infinite;"></i>
+            <span class="status-text">AI评分处理中...</span>
+          </div>
+          <div class="status-description">
+            <p>系统正在对您提交的文件进行智能评分，这个过程可能需要几分钟时间。</p>
+            <p>评分完成后会自动通知您，您可以继续使用系统的其他功能。</p>
+          </div>
+          <div class="status-progress">
+            <el-progress 
+              :percentage="gradingProgress" 
+              :stroke-width="8"
+              :show-text="false"
+              status="success">
+            </el-progress>
+            <span class="progress-text">{{ gradingProgressText }}</span>
+          </div>
+        </el-card>
       </div>
 
     </div>
@@ -85,10 +124,10 @@
           :on-progress="(event) => handleProgress(event, '视频')"
           :on-error="handleError"
           accept=".mp4,.avi,.mov"
-          :disabled="isSubmitted || isOverdue"
+          :disabled="isOverdue"
         >
 
-          <template v-if="!isOverdue && !uploadStatus.video">
+          <template v-if="!isOverdue">
           <i class="el-icon-upload"></i>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击上传</em>
@@ -102,9 +141,9 @@
           ></el-progress>
           </template>
 
-          <div v-else class="upload-disabled-tip">
+          <div v-if="isOverdue" class="upload-disabled-tip">
             <i class="el-icon-warning"></i>
-            <span>{{ isOverdue ? '作业已截止' : '作业已提交' }}</span>
+            <span>作业已截止</span>
           </div>
 
         </el-upload>
@@ -154,9 +193,9 @@
           :on-progress="(event) => handleProgress(event, '音频')"
           :on-error="handleError"
           accept=".mp3,.wav"
-          :disabled="isSubmitted || isOverdue"
+          :disabled="isOverdue"
         >
-          <template v-if="!isOverdue && !uploadStatus.audio">
+          <template v-if="!isOverdue">
 
           <i class="el-icon-upload"></i>
           <div class="el-upload__text">
@@ -170,9 +209,9 @@
           ></el-progress>
           </template>
 
-          <div v-else class="upload-disabled-tip">
+          <div v-if="isOverdue" class="upload-disabled-tip">
             <i class="el-icon-warning"></i>
-            <span>{{ isOverdue ? '作业已截止' : '作业已提交' }}</span>
+            <span>作业已截止</span>
           </div>
         </el-upload>
       </template>
@@ -185,7 +224,7 @@
       >
         <div class="upload-title">
           <i class="el-icon-document"></i>
-          <span>演讲稿</span>
+          <span>文稿</span>
           <el-tag size="mini" type="info">权重 {{ taskDetails.weights[2] }}%</el-tag>
           <el-tag
             v-if="submissionHistory.submittedFiles.word.submitted"
@@ -212,9 +251,9 @@
           :on-progress="(event) => handleProgress(event, '演讲稿')"
           :on-error="handleError"
           accept=".doc,.docx"
-          :disabled="isSubmitted ||isOverdue"
+          :disabled="isOverdue"
         >
-          <template v-if="!isOverdue && !uploadStatus.word">
+          <template v-if="!isOverdue">
           <i class="el-icon-upload"></i>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击上传</em>
@@ -226,9 +265,9 @@
             :stroke-width="4"
           ></el-progress>
           </template>
-          <div v-else class="upload-disabled-tip">
+          <div v-if="isOverdue" class="upload-disabled-tip">
             <i class="el-icon-warning"></i>
-            <span>{{ isOverdue ? '作业已截止' : '作业已提交' }}</span>
+            <span>作业已截止</span>
           </div>
         </el-upload>
 
@@ -268,9 +307,9 @@
           :on-progress="(event) => handleProgress(event, 'PPT')"
           :on-error="handleError"
           accept=".pdf"
-          :disabled="isSubmitted || isOverdue"
+          :disabled="isOverdue"
         >
-          <template v-if="!isOverdue && !uploadStatus.ppt">
+          <template v-if="!isOverdue">
           <i class="el-icon-upload"></i>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击上传</em>
@@ -282,9 +321,9 @@
             :stroke-width="4"
           ></el-progress>
           </template>
-          <div v-else class="upload-disabled-tip">
+          <div v-if="isOverdue" class="upload-disabled-tip">
             <i class="el-icon-warning"></i>
-            <span>{{ isOverdue ? '作业已截止' : '作业已提交' }}</span>
+            <span>作业已截止</span>
           </div>
         </el-upload>
       </div>
@@ -341,7 +380,7 @@
         <!-- 演讲稿模态 -->
         <div v-if="previewFiles.word" class="modal-card">
           <div class="modal-header">
-            <h4>演讲稿</h4>
+            <h4>文稿</h4>
           </div>
           <div class="preview-content">
             <div class="preview-file-info">
@@ -543,6 +582,9 @@ export default {
       previewLoading: false, // 预览加载状态
       wordContent: '', // Word文档内容
       machineEvaluations: {} ,// 存储机评数据
+      pollingTimer: null, // 轮询定时器
+      gradingStartTime: null, // 评分开始时间
+      completedGradingTypes: [], // 已完成评分的类型
     };
   },
 
@@ -592,6 +634,31 @@ export default {
     hasPreviewFiles() {
       return Object.values(this.previewFiles).some(file => file !== null);
     },
+    // 评分进度计算
+    gradingProgress() {
+      if (!this.taskDetails.submissionTypes || this.taskDetails.submissionTypes.length === 0) {
+        return 0;
+      }
+      const totalTypes = this.taskDetails.submissionTypes.length;
+      const completedTypes = this.completedGradingTypes.length;
+      return Math.round((completedTypes / totalTypes) * 100);
+    },
+    // 评分进度文本
+    gradingProgressText() {
+      if (!this.taskDetails.submissionTypes) {
+        return '准备中...';
+      }
+      const totalTypes = this.taskDetails.submissionTypes.length;
+      const completedTypes = this.completedGradingTypes.length;
+      
+      if (completedTypes === 0) {
+        return '正在处理文件...';
+      } else if (completedTypes < totalTypes) {
+        return `已完成 ${completedTypes}/${totalTypes} 项评分`;
+      } else {
+        return '所有评分已完成！';
+      }
+    },
     isVideoRequired() {
       return this.taskDetails && this.taskDetails.submissionTypes.includes('视频');
     }
@@ -603,11 +670,74 @@ export default {
         const response = await getTaskInfoById(this.taskId);
         if (response.code === 1) {
           this.taskDetails = response.data;
+          // 确保attachmentFileNames字段存在
+          if (!this.taskDetails.attachmentFileNames) {
+            this.taskDetails.attachmentFileNames = {};
+          }
+          // 调试日志：打印获取到的deadline
+          console.log('获取到的任务详情deadline:', {
+            deadline: this.taskDetails.deadline,
+            deadline类型: typeof this.taskDetails.deadline,
+            taskId: this.taskId
+          });
         } else {
           console.error("获取任务详情失败:", response.msg);
         }
       } catch (error) {
         console.error("获取任务详情时发生错误:", error);
+      }
+    },
+    
+    // 获取文件名（优先使用原始文件名）
+    getFileName(filePath) {
+      if (!filePath) return '';
+      // 优先从attachmentFileNames映射中获取原始文件名
+      if (this.taskDetails && this.taskDetails.attachmentFileNames && this.taskDetails.attachmentFileNames[filePath]) {
+        return this.taskDetails.attachmentFileNames[filePath];
+      }
+      // 如果没有映射，从路径中提取文件名
+      return filePath.split('/').pop() || filePath;
+    },
+    
+    // 下载附件
+    async downloadAttachment(filePath) {
+      if (!filePath) {
+        this.$message.error('文件路径无效');
+        return;
+      }
+      try {
+        // 从attachmentFileNames映射中获取原始文件名
+        const originalFileName = (this.taskDetails && this.taskDetails.attachmentFileNames && this.taskDetails.attachmentFileNames[filePath])
+          ? this.taskDetails.attachmentFileNames[filePath]
+          : filePath.split('/').pop() || 'file';
+        
+        // 直接调用file-service的接口（8082端口）
+        const fileServiceUrl = `http://localhost:8082/file/showFile?fileType=teacherTask&fileName=${encodeURIComponent(filePath)}`;
+        
+        // 使用axios下载文件，添加token认证
+        const axios = require('axios');
+        const response = await axios.get(fileServiceUrl, {
+          responseType: 'blob',
+          timeout: 60000,
+          headers: {
+            'token': this.$store.getters.token || ''
+          }
+        });
+        
+        // 创建blob对象并下载
+        const blob = new Blob([response.data]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', originalFileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        this.$message.success('文件下载成功');
+      } catch (error) {
+        console.error('下载附件失败:', error);
+        this.$message.error('下载附件失败，请稍后重试');
       }
     },
     toggleDetails() {
@@ -663,15 +793,7 @@ export default {
         return false;
       }
 
-      // 检查是否重复提交
-      const fileType = this.getFileType(file);
-      if (this.uploadStatus[fileType]) {
-        this.currentFile = file;
-        this.currentFileType = fileType;
-        this.confirmDialogVisible = true;
-        return false;
-      }
-
+      // 允许重新上传，不阻止
       return true;
     },
 
@@ -828,11 +950,183 @@ export default {
       throw new Error('文件处理超时，请刷新页面检查处理状态');
     },
 
+    // 生成文件名
+    generateFileName(fileType, file) {
+      // 优先使用 MongoDB 中存储的 fileName（后端会在更新截止日期时同步更新）
+      // 如果没有存储的 fileName，再使用最新的 deadline 生成
+      
+      const submissionTypeMap = {
+        'video': '视频',
+        'audio': '音频',
+        'word': '演讲稿',
+        'ppt': 'PPT'
+      };
+      
+      const submissionType = submissionTypeMap[fileType];
+      if (!submissionType) {
+        console.error('未知的文件类型:', fileType);
+        return null;
+      }
+
+      // 优先使用 MongoDB 中存储的 fileName
+      if (this.currentSubmission && this.currentSubmission.taskInfos) {
+        const taskInfo = this.currentSubmission.taskInfos.find(
+          info => info.submissionType === submissionType
+        );
+        
+        if (taskInfo && taskInfo.fileName) {
+          // 获取文件扩展名，确保与实际上传的文件扩展名一致
+          const originalFileName = file.name || '';
+          const fileExtension = originalFileName.includes('.') 
+            ? '.' + originalFileName.split('.').pop() 
+            : (fileType === 'video' ? '.mp4' : fileType === 'audio' ? '.mp3' : fileType === 'word' ? '.docx' : '.pptx');
+          
+          const storedFileName = taskInfo.fileName;
+          
+          // 检查 fileName 中的截止日期是否过期
+          // 文件名格式：/{userId}/{taskId}/{submissionType}/{deadline}.{extension}
+          const fileNameParts = storedFileName.split('/');
+          if (fileNameParts.length >= 4) {
+            const deadlinePart = fileNameParts[fileNameParts.length - 1]; // 获取最后一部分（包含截止日期和扩展名）
+            const dotIndex = deadlinePart.lastIndexOf('.');
+            if (dotIndex !== -1) {
+              const deadlineStr = deadlinePart.substring(0, dotIndex);
+              
+              // 解析截止日期
+              try {
+                const deadlineDate = new Date(deadlineStr);
+                const now = new Date();
+                
+                // 如果截止日期已过期，使用最新的 taskDetails.deadline 生成新的 fileName
+                if (!isNaN(deadlineDate.getTime()) && deadlineDate < now) {
+                  console.warn(`MongoDB 中存储的文件名截止日期已过期: ${deadlineStr}，使用最新的 deadline 生成新文件名`);
+                  
+                  // 使用最新的 deadline 生成新文件名
+                  if (this.taskDetails && this.taskDetails.deadline) {
+                    const newDeadline = new Date(this.taskDetails.deadline);
+                    if (!isNaN(newDeadline.getTime())) {
+                      const year = newDeadline.getFullYear();
+                      const month = String(newDeadline.getMonth() + 1).padStart(2, '0');
+                      const day = String(newDeadline.getDate()).padStart(2, '0');
+                      const hours = String(newDeadline.getHours()).padStart(2, '0');
+                      const minutes = String(newDeadline.getMinutes()).padStart(2, '0');
+                      const newDeadlineStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+                      
+                      // 构建新的文件名：/{userId}/{taskId}/{submissionType}/{newDeadline}.{extension}
+                      const fileTypeMap = {
+                        'video': 'video',
+                        'audio': 'audio',
+                        'word': 'docx',
+                        'ppt': 'ppt'
+                      };
+                      const typeStr = fileTypeMap[fileType];
+                      if (typeStr) {
+                        const newFileName = `/${fileNameParts[1]}/${fileNameParts[2]}/${typeStr}/${newDeadlineStr}${fileExtension}`;
+                        console.log(`生成新的文件名（截止日期已过期）: ${newFileName}`);
+                        return newFileName;
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('解析 fileName 中的截止日期失败:', e);
+              }
+            }
+          }
+          
+          // 如果存储的文件名扩展名与实际上传的文件扩展名不同，需要替换扩展名
+          const lastDotIndex = storedFileName.lastIndexOf('.');
+          if (lastDotIndex !== -1) {
+            const storedExtension = storedFileName.substring(lastDotIndex);
+            if (storedExtension !== fileExtension) {
+              // 扩展名不同，替换扩展名
+              const fileNameWithoutExt = storedFileName.substring(0, lastDotIndex);
+              console.log(`文件扩展名不匹配，替换扩展名: ${storedExtension} -> ${fileExtension}`);
+              return fileNameWithoutExt + fileExtension;
+            }
+          }
+          
+          console.log(`使用 MongoDB 中存储的文件名: ${storedFileName}`);
+          return storedFileName;
+        }
+      }
+      
+      // 如果没有存储的 fileName，使用最新的 deadline 生成（向后兼容）
+      console.warn('MongoDB 中没有存储的文件名，使用最新的 deadline 生成');
+      
+      const fileTypeMap = {
+        'video': 'video',
+        'audio': 'audio',
+        'word': 'docx',
+        'ppt': 'ppt'
+      };
+      
+      const typeStr = fileTypeMap[fileType];
+      if (!typeStr) {
+        console.error('未知的文件类型:', fileType);
+        return null;
+      }
+
+      // 获取文件扩展名
+      const originalFileName = file.name || '';
+      const fileExtension = originalFileName.includes('.') 
+        ? '.' + originalFileName.split('.').pop() 
+        : (fileType === 'video' ? '.mp4' : fileType === 'audio' ? '.mp3' : fileType === 'word' ? '.docx' : '.pptx');
+
+      // 格式化截止时间（转换为 ISO 格式，格式：yyyy-MM-ddTHH:mm）
+      let deadlineStr = '';
+      if (this.taskDetails && this.taskDetails.deadline) {
+        const deadline = new Date(this.taskDetails.deadline);
+        
+        // 验证日期是否有效
+        if (isNaN(deadline.getTime())) {
+          console.error('deadline 解析失败:', this.taskDetails.deadline);
+          // 如果解析失败，使用当前时间
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          deadlineStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+        } else {
+          // 格式化为 yyyy-MM-ddTHH:mm（去掉秒和时区）
+          const year = deadline.getFullYear();
+          const month = String(deadline.getMonth() + 1).padStart(2, '0');
+          const day = String(deadline.getDate()).padStart(2, '0');
+          const hours = String(deadline.getHours()).padStart(2, '0');
+          const minutes = String(deadline.getMinutes()).padStart(2, '0');
+          deadlineStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+      } else {
+        // 如果没有截止时间，使用当前时间
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        deadlineStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+        console.warn('taskDetails.deadline 为空，使用当前时间作为deadline');
+      }
+
+      // 构建文件名：/{userId}/{taskId}/{submissionType}/{deadline}.{extension}
+      const fileName = `/${this.userId}/${this.taskId}/${typeStr}/${deadlineStr}${fileExtension}`;
+      return fileName;
+    },
+
     async submitAllFiles() {
       if (!this.canSubmit || this.isSubmitting) return;
 
       try {
         this.isSubmitting = true;
+        
+        // 确保已获取提交状态（包含 MongoDB 中存储的 fileName）
+        // 如果还没有获取，先获取一次
+        if (!this.currentSubmission) {
+          await this.fetchSubmissionStatus();
+        }
+        
         let uploadSuccess = true;
 
         // 按顺序处理每个文件的上传
@@ -842,10 +1136,20 @@ export default {
           const formData = new FormData();
           const paramMapping = FILE_PARAM_MAPPING[fileType];
           formData.append(paramMapping.fileParam, file);
-          formData.append(paramMapping.nameParam, this.parsedFileNames[paramMapping.type]);
+          
+          // 生成或获取文件名
+          const fileName = this.generateFileName(fileType, file);
+          if (!fileName) {
+            this.$message.error(`${paramMapping.type}文件名生成失败，请重试`);
+            uploadSuccess = false;
+            break;
+          }
+          formData.append(paramMapping.nameParam, fileName);
 
           try {
             let response;
+            console.log(`开始上传 ${paramMapping.type}，文件名:`, fileName);
+            
             // 分别处理每种类型的文件上传
             switch (fileType) {
               case 'video':
@@ -862,10 +1166,13 @@ export default {
                 break;
             }
 
+            console.log(`${paramMapping.type} 上传响应:`, response);
+
             // 检查每个上传的响应
-            if (response.code !== 0) {
+            if (!response || response.code !== 1) {
               uploadSuccess = false;
-              throw new Error(`${paramMapping.type}上传失败: ${response.msg}`);
+              const errorMsg = response?.msg || '上传失败，未收到有效响应';
+              throw new Error(`${paramMapping.type}上传失败: ${errorMsg}`);
             }
 
             // 显示每个文件上传成功的消息
@@ -873,26 +1180,50 @@ export default {
 
           } catch (error) {
             uploadSuccess = false;
-            this.$message.error(error.message || `${paramMapping.type}上传失败`);
+            console.error(`${paramMapping.type} 上传错误:`, error);
+            
+            // 检查是否是认证错误（401或token过期）
+            const errorMessage = error.message || error.toString() || '';
+            const responseData = error.response?.data;
+            const isAuthError = 
+              error.response?.status === 401 ||
+              responseData?.code === 401 ||
+              errorMessage.includes('401') ||
+              errorMessage.includes('登录') ||
+              errorMessage.includes('过期') ||
+              errorMessage.includes('expired') ||
+              (responseData?.msg && (responseData.msg.includes('JWT expired') || responseData.msg.includes('expired') || responseData.msg.includes('过期')));
+            
+            if (isAuthError) {
+              // 认证错误，显示登录过期提示（request.js的拦截器会处理重新登录对话框）
+              this.$message.error('登录状态已过期，请重新登录后重试');
+            } else if (errorMessage.includes('timeout') || errorMessage.includes('超时')) {
+              // 真正的超时错误
+              this.$message.error(`${paramMapping.type}上传超时，请检查网络连接后重试`);
+            } else {
+              // 其他错误
+              this.$message.error(errorMessage || `${paramMapping.type}上传失败`);
+            }
             break; // 如果有一个上传失败，停止后续上传
           }
         }
 
-        // 只有在所有文件都成功上传后才开始轮询
+        // 只有在所有文件都成功上传后才开始异步评分处理
         if (uploadSuccess) {
-          this.$message.success('所有文件上传完成，开始处理...');
+          this.$message.success('所有文件上传完成！');
+          
+          // 立即显示处理状态
+          this.$message({
+            message: '文件正在进行AI评分处理，这可能需要几分钟时间。您可以继续使用系统，评分完成后会自动通知您。',
+            type: 'info',
+            duration: 10000
+          });
 
-          try {
-            const processed = await this.checkFileProcessingStatus();
-            if (processed) {
-              const grades = await fetchAllGrades(this.userId, this.taskId, this.taskDetails);
-              if (grades) {
-                this.handleGradeResults(grades);
-              }
-            }
-          } catch (error) {
-            throw new Error('文件处理失败：' + error.message);
-          }
+          // 重新获取提交状态，更新按钮显示
+          await this.fetchSubmissionStatus();
+          
+          // 异步启动评分处理和轮询，不阻塞用户界面
+          this.startAsyncGradeProcessing();
         }
 
       } catch (error) {
@@ -926,14 +1257,9 @@ export default {
       Object.entries(grades).forEach(([type, evaluation]) => {
         if (evaluation.finished) {
           let grade = evaluation.grade;
-          // 音频分数特殊处理 - 使用与表格相同的转换逻辑
-          if (type === '音频' && grade !== null) {
-            if (grade > 0) {  // 只有分数大于0时才进行转换
-              grade = grade * 20 + 10; // 将0-5分转换为0-100分制
-              grade = Math.min(Math.round(grade), 100); // 确保不超过100分
-            } else {
-              grade = 0;  // 当分数为0时保持0分
-            }
+          // 音频分数处理 - 后端返回的已经是0-100分制，直接使用
+          if (type === '音频' && grade !== null && grade !== undefined) {
+            grade = Math.min(Math.max(Math.round(Number(grade)), 0), 100); // 确保为整数且在0-100之间
           }
 
           const notificationConfig = {
@@ -1230,6 +1556,291 @@ export default {
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
     },
 
+    // 异步启动评分处理
+    async startAsyncGradeProcessing() {
+      // 记录评分开始时间
+      this.gradingStartTime = Date.now();
+      this.completedGradingTypes = [];
+      
+      // 计算初始延迟时间 - 根据文件类型和大小
+      const initialDelay = this.calculateInitialDelay();
+      
+      this.$message({
+        message: `文件处理需要时间，将在${initialDelay/1000}秒后开始检查评分状态...`,
+        type: 'info',
+        duration: 5000
+      });
+      
+      // 延迟启动轮询，给后端足够的处理时间
+      setTimeout(async () => {
+        try {
+          // 首先检查文件处理状态
+          const processed = await this.checkFileProcessingStatus();
+          if (processed) {
+            // 启动智能轮询
+            this.startIntelligentPolling();
+          }
+        } catch (error) {
+          console.warn('初始评分检查失败，直接启动轮询:', error.message);
+          // 即使初始检查失败，也启动轮询
+          this.startIntelligentPolling();
+        }
+      }, initialDelay);
+    },
+
+    // 智能轮询 - 使用递增间隔策略
+    startIntelligentPolling() {
+      if (this.pollingTimer) {
+        clearInterval(this.pollingTimer);
+      }
+      
+      // 根据文件类型调整轮询参数
+      const pollingConfig = this.calculatePollingConfig();
+      const MAX_POLLING_TIME = pollingConfig.maxTime;
+      const INITIAL_INTERVAL = pollingConfig.initialInterval;
+      const MAX_INTERVAL = pollingConfig.maxInterval;
+      const INTERVAL_MULTIPLIER = pollingConfig.multiplier;
+      
+      let currentInterval = INITIAL_INTERVAL;
+      let attempts = 0;
+      const startTime = Date.now();
+      
+      const poll = async () => {
+        attempts++;
+        const elapsed = Date.now() - startTime;
+        
+        console.log(`智能轮询第${attempts}次 (已用时: ${Math.round(elapsed/1000)}秒, 间隔: ${currentInterval/1000}秒, 最大时长: ${MAX_POLLING_TIME/1000}秒)`);
+        
+        try {
+          const grades = await fetchAllGrades(this.userId, this.taskId, this.taskDetails);
+          if (grades && Object.keys(grades).length > 0) {
+            // 检查是否有新的评分完成 - 使用更精确的完成条件
+            const completedGrades = Object.entries(grades).filter(([type, grade]) => 
+              this.isGradeComplete(type, grade)
+            );
+            
+            if (completedGrades.length > 0) {
+              // 更新已完成的评分类型
+              const newCompletedTypes = completedGrades.map(([type]) => type);
+              const reallyNewTypes = newCompletedTypes.filter(type => 
+                !this.completedGradingTypes.includes(type)
+              );
+              
+              if (reallyNewTypes.length > 0) {
+                this.completedGradingTypes.push(...reallyNewTypes);
+                
+                this.handleGradeResults(grades);
+                
+                // 显示完成通知
+                const completedTypesText = reallyNewTypes.join('、');
+                this.$notify({
+                  title: '评分完成',
+                  message: `${completedTypesText} 评分已完成！`,
+                  type: 'success',
+                  duration: 8000
+                });
+              }
+              
+              // 检查是否所有评分都完成了
+              const allTypes = this.taskDetails.submissionTypes || [];
+              const allCompleted = allTypes.every(type => 
+                this.isGradeComplete(type, grades[type])
+              );
+              
+              if (allCompleted) {
+                clearTimeout(this.pollingTimer);
+                this.pollingTimer = null;
+                
+                const totalTime = Math.round((Date.now() - this.gradingStartTime) / 1000);
+                this.$message.success(`所有评分已完成！总用时 ${totalTime} 秒`);
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`第${attempts}次轮询失败:`, error.message);
+        }
+        
+        // 检查是否超时
+        if (elapsed >= MAX_POLLING_TIME) {
+          clearTimeout(this.pollingTimer);
+          this.pollingTimer = null;
+          this.$message({
+            message: '评分轮询已停止。如果评分仍在处理中，请稍后刷新页面查看结果。',
+            type: 'info',
+            duration: 8000
+          });
+          return;
+        }
+        
+        // 设置下次轮询
+        currentInterval = Math.min(currentInterval * INTERVAL_MULTIPLIER, MAX_INTERVAL);
+        this.pollingTimer = setTimeout(poll, currentInterval);
+      };
+      
+      // 开始轮询
+      this.pollingTimer = setTimeout(poll, currentInterval);
+    },
+
+    // 启动轮询检查评分状态 (保留旧方法以兼容)
+    startPollingGrades() {
+      if (this.pollingTimer) {
+        clearInterval(this.pollingTimer);
+      }
+      
+      let attempts = 0;
+      const maxAttempts = 20; // 最多轮询20次
+      const interval = 15000; // 15秒间隔
+      
+      this.pollingTimer = setInterval(async () => {
+        attempts++;
+        console.log(`第${attempts}次轮询检查评分状态...`);
+        
+        try {
+          const grades = await fetchAllGrades(this.userId, this.taskId, this.taskDetails);
+          if (grades && Object.keys(grades).length > 0) {
+            // 检查是否有新的评分完成
+            const hasNewGrades = Object.values(grades).some(grade => 
+              grade && grade.finished && grade.grade !== null
+            );
+            
+            if (hasNewGrades) {
+              this.handleGradeResults(grades);
+              this.$message.success('检测到新的评分结果！');
+              clearInterval(this.pollingTimer);
+              this.pollingTimer = null;
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn(`第${attempts}次轮询失败:`, error.message);
+        }
+        
+        // 达到最大尝试次数后停止轮询
+        if (attempts >= maxAttempts) {
+          clearInterval(this.pollingTimer);
+          this.pollingTimer = null;
+          this.$message.info('评分检查已停止，请稍后手动刷新页面查看结果');
+        }
+      }, interval);
+    },
+
+    // 计算初始延迟时间 - 根据提交的文件类型智能调整
+    calculateInitialDelay() {
+      if (!this.taskDetails.submissionTypes) {
+        return 30000; // 默认30秒
+      }
+      
+      let maxDelay = 30000; // 基础延迟30秒
+      
+      this.taskDetails.submissionTypes.forEach(type => {
+        switch (type) {
+          case '视频':
+            // 视频文件需要最长的处理时间
+            maxDelay = Math.max(maxDelay, 120000); // 2分钟
+            break;
+          case '音频':
+            // 音频文件需要中等处理时间
+            maxDelay = Math.max(maxDelay, 90000); // 1.5分钟
+            break;
+          case 'PPT':
+            // PPT文件需要中等处理时间
+            maxDelay = Math.max(maxDelay, 60000); // 1分钟
+            break;
+          case '演讲稿':
+            // 演讲稿处理相对较快
+            maxDelay = Math.max(maxDelay, 45000); // 45秒
+            break;
+        }
+      });
+      
+      console.log(`根据文件类型 [${this.taskDetails.submissionTypes.join(', ')}] 计算初始延迟: ${maxDelay/1000}秒`);
+      return maxDelay;
+    },
+
+    // 计算轮询配置 - 根据文件类型调整轮询策略
+    calculatePollingConfig() {
+      if (!this.taskDetails.submissionTypes) {
+        return {
+          maxTime: 600000,      // 10分钟
+          initialInterval: 30000, // 30秒
+          maxInterval: 120000,   // 2分钟
+          multiplier: 1.3
+        };
+      }
+      
+      const hasVideo = this.taskDetails.submissionTypes.includes('视频');
+      const hasAudio = this.taskDetails.submissionTypes.includes('音频');
+      const hasPPT = this.taskDetails.submissionTypes.includes('PPT');
+      
+      if (hasVideo) {
+        // 有视频文件：使用最长的轮询策略
+        return {
+          maxTime: 900000,      // 15分钟
+          initialInterval: 60000, // 1分钟
+          maxInterval: 180000,   // 3分钟
+          multiplier: 1.4
+        };
+      } else if (hasAudio || hasPPT) {
+        // 有音频或PPT：使用中等轮询策略
+        return {
+          maxTime: 720000,      // 12分钟
+          initialInterval: 45000, // 45秒
+          maxInterval: 150000,   // 2.5分钟
+          multiplier: 1.3
+        };
+      } else {
+        // 只有演讲稿：使用较快的轮询策略
+        return {
+          maxTime: 480000,      // 8分钟
+          initialInterval: 30000, // 30秒
+          maxInterval: 90000,    // 1.5分钟
+          multiplier: 1.2
+        };
+      }
+    },
+
+    // 判断评分是否完成 - 根据文件类型设置不同的完成条件
+    isGradeComplete(type, grade) {
+      if (!grade) return false;
+      
+      // 基础条件：必须有分数
+      if (!grade.finished || grade.grade === null || grade.grade === undefined) {
+        return false;
+      }
+      
+      // 根据文件类型设置不同的完成条件
+      switch (type) {
+        case '视频':
+          // 视频：只需要总分即可（视频评分通常比较简单）
+          return true;
+          
+        case '音频':
+          // 音频：需要详细的评价维度（流利度、准确度等）
+          return grade.evaluationDimensions && 
+                 Array.isArray(grade.evaluationDimensions) && 
+                 grade.evaluationDimensions.length > 0;
+          
+        case 'PPT':
+          // PPT：需要详细的评价维度
+          return grade.evaluationDimensions && 
+                 Array.isArray(grade.evaluationDimensions) && 
+                 grade.evaluationDimensions.length > 0;
+          
+        case '演讲稿':
+          // 演讲稿：需要详细的评价维度
+          return grade.evaluationDimensions && 
+                 Array.isArray(grade.evaluationDimensions) && 
+                 grade.evaluationDimensions.length > 0;
+          
+        default:
+          // 未知类型：保守策略，需要完整信息
+          return grade.evaluationDimensions && 
+                 Array.isArray(grade.evaluationDimensions) && 
+                 grade.evaluationDimensions.length > 0;
+      }
+    },
+
     handleDialogClose() {
       this.confirmDialogVisible = false;
       this.currentFile = null;
@@ -1266,7 +1877,12 @@ export default {
     if (this.deadlineTimer) {
       clearInterval(this.deadlineTimer);
     }
-
+    
+    // 清理轮询定时器
+    if (this.pollingTimer) {
+      clearInterval(this.pollingTimer);
+      this.pollingTimer = null;
+    }
   },
 
 };
@@ -1719,10 +2335,110 @@ export default {
   }
 }
 
+/* 附件显示样式 */
+.attachment-section {
+  margin-top: 15px;
+}
+
+.attachment-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* 附件之间的间距 */
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border: 1px solid #EBEEF5;
+  border-radius: 6px;
+  background-color: #FAFAFA;
+  transition: all 0.3s ease;
+}
+
+.attachment-item:hover {
+  border-color: #409EFF;
+  background-color: #F0F9FF;
+}
+
+.attachment-item .el-icon-document {
+  font-size: 20px;
+  color: #409EFF;
+}
+
+.attachment-name {
+  flex: 1;
+  color: #606266;
+  font-size: 14px;
+}
+
 /* 响应式处理(如果需要在小屏幕上自适应) */
 @media screen and (max-width: 1400px) {
   .upload-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* 评分状态显示样式 */
+.grading-status-section {
+  margin: 20px 0;
+}
+
+.status-card {
+  border: 2px solid #67C23A;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.status-header i {
+  margin-right: 10px;
+  color: #67C23A;
+  font-size: 20px;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-description {
+  margin-bottom: 20px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+.status-description p {
+  margin: 8px 0;
+}
+
+.status-progress {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.status-progress .el-progress {
+  flex: 1;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: #67C23A;
+  font-weight: 500;
+  white-space: nowrap;
+}
 </style>
+
+
+

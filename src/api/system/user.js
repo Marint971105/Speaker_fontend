@@ -125,10 +125,22 @@ export function updateUserPwd(userId,oldPassword,newPassword) {
   })
 }
 
+// 管理员重置密码（不需要旧密码验证）
+export function resetPasswordByAdmin(userId, newPassword) {
+  return request({
+    url: '/account/resetPasswordByAdmin',
+    method: 'get',
+    params: {
+      userId,
+      newPassword
+    }
+  })
+}
+
 // 用户头像上传
 export function uploadAvatar(data) {
   return request({
-    url: '/system/user/profile/avatar',
+    url: '/member/uploadAvatar',
     method: 'post',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     data: data

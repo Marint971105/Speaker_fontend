@@ -9,7 +9,7 @@
         </div>
         <div class="task-info-grid">
           <div>
-            <p>提交内容: {{ task.submissionTypes.join(', ') }}</p>
+            <p>提交内容: {{ formatSubmissionTypes(task.submissionTypes) }}</p>
           </div>
           <div>
             <p>评价流程: {{ task.evaluationMethods.join('-') }}</p>
@@ -24,6 +24,9 @@
             <p :class="{'status-completed': task.completionStatus === '已完成', 'status-uncompleted': task.completionStatus === '未完成'}">
               完成状态: {{ task.completionStatus }}
             </p> <!-- 根据完成状态显示不同颜色 -->
+          </div>
+          <div v-if="task.createTime">
+            <p>创建时间: {{ formatCreateTime(task.createTime) }}</p>
           </div>
         </div>
       </el-card>
@@ -110,6 +113,24 @@ export default {
       const seconds = String(date.getSeconds()).padStart(2, '0');
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     },
+    formatCreateTime(createTime) {
+      if (!createTime) return '';
+      const date = new Date(createTime);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    },
+    // 格式化提交类型，将"演讲稿"显示为"文稿"
+    formatSubmissionTypes(submissionTypes) {
+      if (!submissionTypes || !Array.isArray(submissionTypes)) {
+        return '';
+      }
+      return submissionTypes.map(type => type === '演讲稿' ? '文稿' : type).join(', ');
+    },
   },
 };
 </script>
@@ -140,8 +161,9 @@ export default {
 }
 
 .task-name {
-  font-size: 12px;
+  font-size: 18px;
   font-weight: bold;
+  color: #303133;
 }
 
 .view-button {
@@ -156,16 +178,17 @@ export default {
 }
 
 .task-info-grid p {
-  font-size: 11px;
+  font-size: 14px;
   margin: 0;
+  color: #606266;
 }
 
 .status-completed {
-  color: green; /* 已完成状态显示绿色 */
+  color: #67c23a !important; /* 已完成状态显示绿色 */
 }
 
 .status-uncompleted {
-  color: red; /* 未完成状态显示红色 */
+  color: #f56c6c !important; /* 未完成状态显示红色 */
 }
 
 .task-card-content {

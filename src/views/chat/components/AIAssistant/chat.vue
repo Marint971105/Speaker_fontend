@@ -10,7 +10,16 @@
         >
           <div class="message-content">
             <div class="message-avatar">
-              <el-avatar :size="36" :icon="message.role === 'assistant' ? 'el-icon-service' : 'el-icon-user'" />
+              <el-avatar 
+                v-if="message.role === 'assistant'"
+                :size="60" 
+                :src="assistantAvatar" 
+              />
+              <el-avatar 
+                v-else
+                :size="60" 
+                :icon="'el-icon-user'" 
+              />
             </div>
             <div class="message-bubble" :class="{ 'error-message': message.isError }">
               <div v-if="message.role === 'assistant'"
@@ -54,6 +63,8 @@ import { sendChatMessage, sendStreamChatMessage, getHealth } from '@/api/Ollama/
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
+import assistantAvatarImg from '@/assets/logo/teacher.png'
+
 export default {
   name: 'Chat',
   data() {
@@ -65,7 +76,8 @@ export default {
       currentStreamMessage: null,
       streamMode: true,
       messageSequence: 0,
-      isSystemPrompt: false
+      isSystemPrompt: false,
+      assistantAvatar: assistantAvatarImg
     }
   },
   mounted() {
@@ -81,7 +93,7 @@ export default {
       this.messages.push({
         id: this.getNextSequence(),
         role: 'assistant',
-        content: '你好！我是AI助手。我可以帮你回答问题、解决问题。请告诉我你需要什么帮助？'
+        content: '嗨～你好呀！我是言之“邮”理，你的专属 AI 小助手！'
       })
     }
 
@@ -122,7 +134,7 @@ export default {
       this.messages.push({
         id: this.getNextSequence(),
         role: 'assistant',
-        content: '你好！我是AI助手。我可以帮你回答问题、解决问题。请告诉我你需要什么帮助？'
+        content: '嗨～你好呀！我是言之“邮”理，你的专属 AI 小助手！'
       })
     },
     loadMessages() {

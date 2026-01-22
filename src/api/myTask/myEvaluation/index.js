@@ -23,7 +23,7 @@ export function getEvaluationByTaskIdAndStuId(taskId, stuId) {
 
 export function getReviewTaskByStuId(reviewerId) {
   return request({
-    url: 'task/getReviewTaskByStuId',
+    url: '/task/getReviewTaskByStuId',
     method: 'get',
     params: {
       reviewerId
@@ -60,16 +60,36 @@ export function getSubmissionsByStuId(studentId) {
     params: { studentId }
   })
 }
-// 获取文件
-export function showFile(fileType, fileName) {
+
+// 根据任务ID和学生ID获取学生提交信息
+export function getSubmissionByTaskIdAndStudentId(taskId, studentId) {
   return request({
-    url: '/file/showFile',
+    url: '/task/getSubmissionByTaskIdAndStudentId',
+    method: 'get',
+    params: { taskId, studentId }
+  })
+}
+// 获取文件
+// file-service是独立服务，通过Nginx代理
+// 使用 request 函数，会自动添加 /api 前缀，与上传接口保持一致
+export function showFile(fileType, fileName) {
+  // 根据文件类型设置不同的超时时间
+  // 视频和音频文件通常较大，需要更长的超时时间
+  let timeout = 60000; // 默认60秒
+  if (fileType === 'video' || fileType === 'audio') {
+    timeout = 600000; // 视频和音频文件：10分钟超时
+  } else if (fileType === 'word' || fileType === 'ppt') {
+    timeout = 120000; // Word和PPT文件：2分钟超时
+  }
+  
+  return request({
+    url: '/file/showFile',  // request 函数会自动添加 /api 前缀，变成 /api/file/showFile
     method: 'get',
     params: {
       fileType,
       fileName
     },
     responseType: 'blob', // 设置响应类型为blob
-    timeout: 60000, // 文件较大，设置更长的超时时间
+    timeout: timeout, // 根据文件类型动态设置超时时间
   })
 }

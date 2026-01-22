@@ -56,7 +56,11 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="userName" label="邮箱" min-width="200" show-overflow-tooltip />
+        <el-table-column label="邮箱" min-width="200" show-overflow-tooltip>
+          <template slot-scope="scope">
+            {{ scope.row.userName && scope.row.userName.includes('@') ? scope.row.userName : '未设置' }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template slot-scope="scope">
             <el-tag
@@ -121,7 +125,11 @@
         v-if="assignedTeachers.length"
       >
         <el-table-column prop="nickName" label="教师姓名" min-width="120" />
-        <el-table-column prop="userName" label="邮箱" min-width="200" show-overflow-tooltip />
+        <el-table-column label="邮箱" min-width="200" show-overflow-tooltip>
+          <template slot-scope="scope">
+            {{ scope.row.userName && scope.row.userName.includes('@') ? scope.row.userName : '未设置' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="100" align="center">
         </el-table-column>
       </el-table>
@@ -133,7 +141,7 @@
 
 <script>
 import { getMembers } from '@/api/memeberManage/member'
-import { setReviewTeachers } from '@/api/homeworkManage/assignTask'
+import { setReviewTeachers, getClassTeachersByTaskId } from '@/api/homeworkManage/assignTask'
 import { getTaskInfoById } from '@/api/homeworkManage/assignTask'
 import { getUserProfile } from '@/api/system/user'
 
@@ -203,14 +211,22 @@ export default {
       }
     },
 
-    // 获取教师列表
+    // 获取教师列表 - 只获取相关班级的任课教师
     async fetchTeachers() {
       try {
         this.loading.teachers = true
-        const response = await getMembers({})
-        this.teachers = response.data.rows.filter(member => member.roleId === 1)
+        const response = await getClassTeachersByTaskId(this.taskId)
+        if (response.code === 1 && response.data) {
+          // 过滤出教师角色（roleId === 1）
+          this.teachers = response.data.filter(member => member.roleId === 1)
+        } else {
+          this.teachers = []
+          this.$message.warning('未找到相关班级的任课教师')
+        }
       } catch (error) {
+        console.error('获取教师列表失败:', error)
         this.$message.error('获取教师列表失败：' + error.message)
+        this.teachers = []
       } finally {
         this.loading.teachers = false
       }

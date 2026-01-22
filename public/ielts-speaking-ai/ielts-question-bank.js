@@ -334,12 +334,50 @@ You can make some notes to help you if you wish.`,
         return ['Random']; // Part 2 通常是随机的
     }
 
+    // Part 2 话题分类映射（大类 -> 具体题目列表）
+    getPart2TopicCategories() {
+        const allQuestions = this.questionBank['Part 2'];
+        const categories = {
+            '人物类': [],
+            '地点类': [],
+            '经历类': [],
+            '技能类': []
+        };
+        
+        // 根据题目内容自动分类
+        allQuestions.forEach(item => {
+            const topic = item.topic.toLowerCase();
+            if (topic.includes('person') || topic.includes('people') || topic.includes('admire')) {
+                categories['人物类'].push(item.topic);
+            } else if (topic.includes('place') || topic.includes('visit') || topic.includes('location')) {
+                categories['地点类'].push(item.topic);
+            } else if (topic.includes('journey') || topic.includes('trip') || topic.includes('experience') || topic.includes('memorable') || topic.includes('event')) {
+                categories['经历类'].push(item.topic);
+            } else if (topic.includes('skill') || topic.includes('learn') || topic.includes('ability')) {
+                categories['技能类'].push(item.topic);
+            } else {
+                // 默认归类到经历类
+                categories['经历类'].push(item.topic);
+            }
+        });
+        
+        // 移除空的分类
+        Object.keys(categories).forEach(key => {
+            if (categories[key].length === 0) {
+                delete categories[key];
+            }
+        });
+        
+        return categories;
+    }
+
     // 根据类别获取话题列表（新增方法）
     getTopicsByCategory(category) {
         if (category === 'Part 1' || category === 'Part 3') {
             return Object.keys(this.questionBank[category]);
         } else if (category === 'Part 2') {
-            return this.questionBank[category].map(item => item.topic);
+            // 返回话题分类（大类）
+            return Object.keys(this.getPart2TopicCategories());
         }
         return ['Practice']; // Practice类别
     }
@@ -359,14 +397,33 @@ You can make some notes to help you if you wish.`,
                 };
             }
         } else if (category === 'Part 2') {
-            const item = this.questionBank[category].find(item => item.topic === topic);
-            if (item) {
-                return {
-                    part: category,
-                    ...item,
-                    type: 'long_answer',
-                    tips: this.getQuestionTips(category)
-                };
+            // 如果 topic 是分类名称（大类），则从该分类下随机选择一个题目
+            const categories = this.getPart2TopicCategories();
+            if (categories[topic] && categories[topic].length > 0) {
+                // 从该分类下的所有具体话题中随机选择一个
+                const topicList = categories[topic];
+                const randomTopic = topicList[Math.floor(Math.random() * topicList.length)];
+                const item = this.questionBank[category].find(item => item.topic === randomTopic);
+                if (item) {
+                    return {
+                        part: category,
+                        ...item,
+                        category: topic, // 保存分类信息
+                        type: 'long_answer',
+                        tips: this.getQuestionTips(category)
+                    };
+                }
+            } else {
+                // 如果不是分类名称，则按原来的逻辑查找
+                const item = this.questionBank[category].find(item => item.topic === topic);
+                if (item) {
+                    return {
+                        part: category,
+                        ...item,
+                        type: 'long_answer',
+                        tips: this.getQuestionTips(category)
+                    };
+                }
             }
         }
         return null;

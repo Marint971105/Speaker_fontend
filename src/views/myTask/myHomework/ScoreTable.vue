@@ -48,8 +48,14 @@
         <template slot-scope="scope">
     <span
       :class="{
-        'clickable-type': scope.row.total !== null && scope.row.total !== '-',
-        'disabled-type': scope.row.total === null || scope.row.total === '-'
+        'clickable-type': (scope.row.video !== null && scope.row.video !== '-') ||
+                         (scope.row.audio !== null && scope.row.audio !== '-') ||
+                         (scope.row.ppt !== null && scope.row.ppt !== '-') ||
+                         (scope.row.speech !== null && scope.row.speech !== '-'),
+        'disabled-type': !((scope.row.video !== null && scope.row.video !== '-') ||
+                          (scope.row.audio !== null && scope.row.audio !== '-') ||
+                          (scope.row.ppt !== null && scope.row.ppt !== '-') ||
+                          (scope.row.speech !== null && scope.row.speech !== '-'))
       }"
       @click="handleTypeClick(scope.row.type, scope.row.total)"
     >
@@ -94,7 +100,7 @@
       <!-- 演讲稿成绩列 -->
       <el-table-column
         prop="speech"
-        label="演讲稿"
+        label="文稿"
         align="center"
       >
         <template slot-scope="scope">
@@ -306,11 +312,12 @@ export default {
     processEvaluationData(data) {
       const mapAudioScore = (score) => {
         if (score === null || score === undefined) return null;
-        // 把0-5分映射到0-100分，并提高分数
-        let mappedScore = score * 20 + 10; // 乘以20转换区间，加10分提升基础分
-        // 确保分数不超过100
-        return Math.min(Math.round(mappedScore), 100);
+        // 后端返回的音频分数已经是0-100分制，直接使用，确保为整数且在0-100之间
+        return Math.min(Math.max(Math.round(Number(score)), 0), 100);
       };
+
+      // 使用默认权重，与作业管理保持一致
+      const weights = this.taskDetails?.weights || [25, 25, 25, 25];
 
       return data.evaluationTypes.map(type => {
         const row = {
@@ -326,6 +333,7 @@ export default {
         let totalWeight = 0;
 
         type.evaluationContents.forEach(content => {
+          // 只处理已完成的评估内容
           if (content.finished) {
             let score = content.grade;
             let weight = 0;
@@ -333,8 +341,8 @@ export default {
             switch (content.evaluationContent) {
               case '视频':
                 row.video = score;
-                weight = this.taskDetails?.weights[0] || 0;
-                if (score !== null && score !== '-') {
+                weight = weights[0] || 0;
+                if (score !== null && score !== undefined && score !== '-') {
                   totalScore += Number(score) * weight;
                   totalWeight += weight;
                 }
@@ -342,25 +350,26 @@ export default {
               case '音频':
                 score = mapAudioScore(score);
                 row.audio = score;
-                weight = this.taskDetails?.weights[1] || 0;
-                if (score !== null && score !== '-') {
+                weight = weights[1] || 0;
+                if (score !== null && score !== undefined && score !== '-') {
                   totalScore += Number(score) * weight;
                   totalWeight += weight;
                 }
                 break;
               case 'PPT':
-                // 显示保持原样
                 row.ppt = content.grade;
-                weight = this.taskDetails?.weights[2] || 0;
-                if (score !== null && score !== '-') {
+                score = content.grade; // 确保使用正确的分数
+                weight = weights[2] || 0;
+                if (score !== null && score !== undefined && score !== '-') {
                   totalScore += Number(score) * weight;
                   totalWeight += weight;
                 }
                 break;
               case '演讲稿':
-                row.speech = score;
-                weight = this.taskDetails?.weights[3] || 0;
-                if (score !== null && score !== '-') {
+                row.speech = content.grade;
+                score = content.grade; // 确保使用正确的分数
+                weight = weights[3] || 0;
+                if (score !== null && score !== undefined && score !== '-') {
                   totalScore += Number(score) * weight;
                   totalWeight += weight;
                 }
@@ -369,9 +378,13 @@ export default {
           }
         });
 
-        // 计算总分
+        // 计算总分：只要有任何已完成的评估内容，就计算总分
+        // 不需要等待所有文件都评估完成，只基于实际已评估的文件计算
         if (totalWeight > 0) {
           row.total = (totalScore / totalWeight).toFixed(2);
+        } else {
+          // 如果没有已完成的评估内容，总分显示为 null
+          row.total = null;
         }
 
         return row;
@@ -394,11 +407,6 @@ export default {
       }
     },
     handleTypeClick(type, total) {
-      // 如果没有总分，直接返回
-      if (total === null || total === '-') {
-        return;
-      }
-
       const routeMap = {
         '自评': 'showSelfReview',
         '机评': 'showmachineEvaluation',
@@ -408,14 +416,37 @@ export default {
 
       const routeName = routeMap[type];
       if (routeName) {
-        this.$router.push({
-          name: routeName, // 使用name进行跳转
-          query: {
-            taskId: this.taskId,
-            submitId: this.submitId,
-            taskDetails: JSON.stringify(this.taskDetails) // 对象需要转成字符串
-          }
-        });
+        // 检查该评估类型是否有已完成的评估内容
+        const evaluationRow = this.scoreData.find(row => row.type === type);
+        const hasFinishedContent = evaluationRow && (
+          (evaluationRow.video !== null && evaluationRow.video !== '-') ||
+          (evaluationRow.audio !== null && evaluationRow.audio !== '-') ||
+          (evaluationRow.ppt !== null && evaluationRow.ppt !== '-') ||
+          (evaluationRow.speech !== null && evaluationRow.speech !== '-')
+        );
+
+        // 如果有已完成的评估内容，允许跳转（即使没有总分）
+        if (hasFinishedContent) {
+          // 获取任务详情，用于传递权重等信息
+          const taskDetails = this.taskDetails || {};
+          
+          this.$router.push({
+            name: routeName, // 使用name进行跳转
+            query: {
+              taskId: this.taskId,
+              submitId: this.submitId,
+              // 传递 taskDetails，与作业管理保持一致
+              taskDetails: JSON.stringify({
+                taskName: taskDetails.taskName || '',
+                taskId: this.taskId,
+                weights: taskDetails.weights || [25, 25, 25, 25],
+                submissionTypes: taskDetails.submissionTypes || []
+              })
+            }
+          });
+        } else {
+          this.$message.warning('该评估维度尚未完成，无法查看详情');
+        }
       }
     },
   },
@@ -423,7 +454,7 @@ export default {
     this.fetchScores();  // 初始获取
     if (this.submissionStatus === 'submitted') {  // 添加这个判断
       this.startGradingCheck();  // 如果已是提交状态，开始轮询
-    }
+    } 
   },
   beforeDestroy() {
     if (this.pollTimer) {

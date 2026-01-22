@@ -1,29 +1,102 @@
 <template>
   <div class="home">
+    <!-- 用户须知弹窗 - 重新设计 -->
+    <el-dialog
+      :title="noticeDialogTitle"
+      :visible.sync="noticeDialogVisible"
+      width="550px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      :modal="true"
+      :modal-append-to-body="true"
+      :append-to-body="true"
+      custom-class="user-notice-dialog"
+      @opened="onNoticeDialogOpened"
+      @closed="onNoticeDialogClosed">
+      <div class="notice-content">
+        <div class="notice-header">
+          <i class="el-icon-warning notice-icon"></i>
+          <span class="notice-title-text">重要提示</span>
+        </div>
+        <div class="notice-body">
+          <p class="notice-intro">您必须完善个人信息，因为：</p>
+          <ul class="notice-list">
+            <li>
+              <i class="el-icon-check notice-list-icon"></i>
+              <span>系统需要您的个人信息进行<strong class="highlight-text">评价分析</strong></span>
+            </li>
+            <li>
+              <i class="el-icon-check notice-list-icon"></i>
+              <span>系统需要您的个人信息<strong class="highlight-text">发送作业提醒</strong>等通知</span>
+            </li>
+            <li>
+              <i class="el-icon-check notice-list-icon"></i>
+              <span>完整的个人信息有助于系统为您提供更好的服务</span>
+            </li>
+          </ul>
+          <div class="notice-warning">
+            <i class="el-icon-info"></i>
+            <span>请尽快完善您的个人信息！</span>
+          </div>
+        </div>
+      </div>
+      <span slot="footer" class="dialog-footer">
+        <el-button type="primary" size="medium" @click="handleNoticeConfirm" class="notice-confirm-btn">
+          <i class="el-icon-check"></i>
+          我知道了
+        </el-button>
+      </span>
+    </el-dialog>
+
+    <!-- 右下角提醒 -->
+    <div v-if="showReminder" class="profile-reminder">
+      <el-alert
+        title="请完善个人信息"
+        type="warning"
+        :closable="true"
+        @close="closeReminder"
+        show-icon>
+        <template slot="default">
+          <span>您的个人信息不完整，请尽快完善以便系统为您提供更好的服务</span>
+          <el-button type="text" @click="goToProfile" style="margin-left: 10px; padding: 0;">立即完善</el-button>
+        </template>
+      </el-alert>
+    </div>
+
     <!-- 背景图 -->
     <div class="background"></div>
 
     <!-- Hero Section -->
     <section class="hero">
       <div class="container hero-content">
-        <h1 class="main-title">多模态英语教学与评估平台</h1>
+        <h1 class="main-title">多模态语言教学与智能评估平台</h1>
         <p class="tagline">AI助力言之邮理，AI助力您言之有理</p>
       </div>
     </section>
 
     <!-- Features Section -->
-    <!-- Features Section -->
     <section class="features">
       <div class="container">
+        <!-- 隐私保护说明 -->
+        <div class="privacy-notice">
+          <span class="privacy-icon">🔒</span>
+          <span class="privacy-text">隐私保护承诺：我们严格保护您的个人信息和数据安全，所有数据均加密存储和传输，不会向任何第三方泄露、出售或共享。</span>
+        </div>
+        
         <div class="feature-grid">
-          <div v-for="feature in features"
+          <div v-for="(feature, index) in features"
                :key="feature.id"
                class="feature-wrapper">
             <div class="feature-card" 
                  @click="handleFeatureClick(feature.id)"
-                 :class="{ clickable: feature.id === 1 || feature.id === 2 || feature.id === 3 || feature.id === 4 }">
+                 :class="{ 
+                   clickable: feature.id === 1 || feature.id === 2 || feature.id === 3 || feature.id === 4,
+                   'teacher-manage': index === 0,
+                   'special-feature': index > 0
+                 }">
               <h3>{{ feature.title }}</h3>
-              <div class="scene-text">{{ feature.scene }}</div>
+              <div class="scene-text" :class="{ 'highlight-scene': true }">{{ feature.scene }}</div>
               <p>{{ feature.description }}</p>
             </div>
             <div class="icon-section">
@@ -68,6 +141,8 @@
 </template>
 
 <script>
+import { getUserProfile } from "@/api/system/user";
+
 export default {
   name: "Index",
   data() {
@@ -98,10 +173,18 @@ export default {
           number: "20+",
           label: "高校高中共建共享"
         },
-      ]
+      ],
+      noticeDialogVisible: false, // 控制用户须知弹窗显示
+      noticeDialogTitle: '用户须知', // 弹窗标题
+      showReminder: false, // 控制右下角提醒显示
+      user: {}, // 用户信息
+      checkTimer: null // 检查定时器
     }
   },
   computed: {
+    userId() {
+      return this.$store.getters.userId || this.$store.getters.id;
+    },
     features() {
       const roles = this.$store.getters.roles;
       const isAdmin = roles.includes('admin');
@@ -136,7 +219,7 @@ export default {
         },
         {
           id: 4,
-          title: "英语语音智能评价",
+          title: "中英文语音智能评价",
           description: "基于语音识别与分析技术，精准评估发音、语调及流利度，助力提升口语表达能力",
           icon: require('@/assets/菜单设置.png'),
           iconTextEn: "Multidimensional Ability",
@@ -145,23 +228,62 @@ export default {
         }
       ];
 
-      if (isAdmin) {
-        // 教师/管理员顺序
-        return [
-          allFeatures[2], // 公众演讲多模态教学与智能评价
-          allFeatures[0], // 演讲稿智能写作与评价
-          allFeatures[1], // 演讲视频智能评价
-          allFeatures[3]  // 英语语音智能评价
-        ];
-      } else {
-        // 学生顺序
-        return [
-          allFeatures[0], // 演讲稿智能写作与评价
-          allFeatures[1], // 演讲视频智能评价
-          allFeatures[3], // 英语语音智能评价
-          allFeatures[2]  // 公众演讲多模态教学与智能评价
-        ];
-      }
+      // 教师/管理员和学生使用相同的顺序
+      return [
+        allFeatures[2], // 公众演讲多模态教学与智能评价
+        allFeatures[0], // 演讲稿智能写作与评价
+        allFeatures[1], // 演讲视频智能评价
+        allFeatures[3]  // 英语语音智能评价
+      ];
+    }
+  },
+  mounted() {
+    // 页面加载完成后，延迟检查用户信息（确保用户信息已加载）
+    this.$nextTick(() => {
+      // 使用多次尝试，确保用户信息已加载
+      let retryCount = 0;
+      const maxRetries = 10;
+      
+      const checkUserInfo = () => {
+        if (this.userId) {
+          console.log('mounted: 开始检查用户信息，userId:', this.userId, '重试次数:', retryCount);
+          this.checkUserInfoComplete();
+        } else if (retryCount < maxRetries) {
+          retryCount++;
+          console.log('mounted: userId为空，等待用户信息加载，重试次数:', retryCount);
+          setTimeout(checkUserInfo, 300);
+        } else {
+          console.warn('mounted: 达到最大重试次数，userId仍为空');
+        }
+      };
+      
+      // 立即检查一次
+      setTimeout(checkUserInfo, 500);
+    });
+  },
+  beforeDestroy() {
+    // 清理定时器
+    if (this.checkTimer) {
+      clearTimeout(this.checkTimer);
+      this.checkTimer = null;
+    }
+  },
+  watch: {
+    // 监听userId变化，当用户登录后自动检测
+    userId: {
+      handler(newVal, oldVal) {
+        console.log('watch userId变化:', { newVal, oldVal });
+        if (newVal && newVal !== oldVal) {
+          // 延迟一下，确保用户信息已经加载完成
+          setTimeout(() => {
+            this.$nextTick(() => {
+              console.log('watch: 开始检查用户信息，userId:', newVal);
+              this.checkUserInfoComplete();
+            });
+          }, 300);
+        }
+      },
+      immediate: false // 改为false，避免在组件创建时立即执行
     }
   },
   methods: {
@@ -226,6 +348,117 @@ export default {
         // 跳转到音频评估页面
         this.$router.push('/homeworkTrial/audio/index');
       }
+    },
+    // 检查用户信息是否完整
+    async checkUserInfoComplete() {
+      console.log('checkUserInfoComplete 被调用，userId:', this.userId);
+      if (!this.userId) {
+        console.log('userId为空，跳过检查');
+        return;
+      }
+      
+      try {
+        console.log('开始获取用户信息，userId:', this.userId);
+        const response = await getUserProfile(this.userId);
+        console.log('获取用户信息响应:', response);
+        
+        if (response.code === 1 && response.data) {
+          this.user = response.data;
+          console.log('用户信息:', this.user);
+          
+          // 检查必填和重要字段是否完整（明确返回布尔值）
+          // 必填字段：用户昵称、邮箱、学号、学校、专业、院系、性别
+          // 手机号不需要必填（通过扫码登录自动填写）
+          // 邮箱需要包含@符号，确保格式正确
+          const emailValid = this.user.userName && this.user.userName.includes('@');
+          const isComplete = Boolean(
+            this.user.nickName && 
+            emailValid && 
+            this.user.studentId && 
+            this.user.school && 
+            this.user.major && 
+            this.user.dept && 
+            this.user.sex
+          );
+          
+          console.log('用户信息完整性检查:', {
+            isComplete,
+            nickName: !!this.user.nickName,
+            userName: !!this.user.userName,
+            studentId: !!this.user.studentId,
+            school: !!this.user.school,
+            major: !!this.user.major,
+            dept: !!this.user.dept,
+            sex: !!this.user.sex,
+            mobile: !!this.user.mobile, // 手机号不需要必填，仅用于日志记录
+            userId: this.userId
+          });
+          
+          if (!isComplete) {
+            // 使用基于userId的sessionStorage key，确保不同用户有不同的记录
+            const noticeStorageKey = `userNoticeShown_${this.userId}`;
+            const hasShownNotice = sessionStorage.getItem(noticeStorageKey);
+            console.log('用户信息不完整，检查用户须知显示状态:', {
+              noticeStorageKey,
+              hasShownNotice,
+              userId: this.userId
+            });
+            
+            if (!hasShownNotice) {
+              // 第一次进入且信息不完整，显示用户须知弹窗
+              console.log('显示用户须知弹窗');
+              // 使用 $nextTick 确保 DOM 更新完成后再显示弹窗
+              this.$nextTick(() => {
+                this.noticeDialogVisible = true;
+                console.log('弹窗状态已设置为显示，noticeDialogVisible:', this.noticeDialogVisible);
+              });
+            } else {
+              console.log('用户须知已显示过，不显示弹窗');
+            }
+            // 无论是否显示过用户须知，只要信息不完整就显示右下角提醒
+            this.showReminder = true;
+          } else {
+            // 如果信息完整，隐藏提醒和弹窗
+            console.log('用户信息完整，隐藏提醒');
+            this.showReminder = false;
+            this.noticeDialogVisible = false;
+            // 清除当前用户的sessionStorage记录，以便下次信息不完整时重新显示
+            const noticeStorageKey = `userNoticeShown_${this.userId}`;
+            sessionStorage.removeItem(noticeStorageKey);
+          }
+        } else {
+          console.warn('获取用户信息失败，响应code:', response.code);
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+      }
+    },
+    // 处理用户须知确认
+    handleNoticeConfirm() {
+      console.log('用户点击确定，关闭用户须知弹窗');
+      this.noticeDialogVisible = false;
+      // 使用基于userId的sessionStorage key，记录当前用户已经显示过用户须知
+      const noticeStorageKey = `userNoticeShown_${this.userId}`;
+      sessionStorage.setItem(noticeStorageKey, 'true');
+      console.log('已记录用户须知显示状态:', noticeStorageKey);
+      // 确保右下角提醒显示
+      this.showReminder = true;
+    },
+    // 弹窗打开时的回调
+    onNoticeDialogOpened() {
+      console.log('用户须知弹窗已打开');
+    },
+    // 弹窗关闭时的回调
+    onNoticeDialogClosed() {
+      console.log('用户须知弹窗已关闭');
+    },
+    // 关闭右下角提醒
+    closeReminder() {
+      this.showReminder = false;
+    },
+    // 跳转到个人信息页面
+    goToProfile() {
+      this.$router.push('/user/profile');
     },
     async processVideo() {
       if (!this.videoRunning) return;
@@ -430,6 +663,26 @@ export default {
   }
 }
 
+/* 隐私保护说明 */
+.privacy-notice {
+  text-align: center;
+  padding: 1rem 2rem;
+  margin-bottom: 1.5rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  
+  .privacy-icon {
+    margin-right: 0.5rem;
+    font-size: 1.2rem;
+  }
+  
+  .privacy-text {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+  }
+}
+
 .features {
   flex: 1;
   padding: 1rem 0;
@@ -469,6 +722,20 @@ export default {
   padding: 1rem 2rem;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  
+  // 教师管理功能 - 第一个卡片（浅蓝色系）
+  &.teacher-manage {
+    background: linear-gradient(135deg, rgba(147, 197, 253, 0.2) 0%, rgba(96, 165, 250, 0.15) 100%);
+    border: 2px solid rgba(147, 197, 253, 0.4);
+    box-shadow: 0 4px 15px rgba(147, 197, 253, 0.2);
+  }
+  
+  // 特色功能 - 后三个卡片统一使用浅绿色系
+  &.special-feature {
+    background: linear-gradient(135deg, rgba(134, 239, 172, 0.2) 0%, rgba(74, 222, 128, 0.15) 100%);
+    border: 2px solid rgba(134, 239, 172, 0.4);
+    box-shadow: 0 4px 15px rgba(134, 239, 172, 0.2);
+  }
 
   h3 {
     text-align: center;
@@ -486,6 +753,14 @@ export default {
     margin-bottom: 1rem;
     font-size: 1.3rem;
     font-weight: 500;
+    
+    &.highlight-scene {
+      font-weight: 700;
+      font-size: 1.5rem;
+      color: #FFD700;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      letter-spacing: 2px;
+    }
   }
 
   p {
@@ -502,8 +777,16 @@ export default {
     
     &:hover {
       transform: translateY(-5px);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-      background: rgba(255, 255, 255, 0.1);
+      
+      &.teacher-manage {
+        box-shadow: 0 8px 25px rgba(147, 197, 253, 0.4);
+        background: linear-gradient(135deg, rgba(147, 197, 253, 0.3) 0%, rgba(96, 165, 250, 0.25) 100%);
+      }
+      
+      &.special-feature {
+        box-shadow: 0 8px 25px rgba(134, 239, 172, 0.4);
+        background: linear-gradient(135deg, rgba(134, 239, 172, 0.3) 0%, rgba(74, 222, 128, 0.25) 100%);
+      }
     }
   }
 }
@@ -614,5 +897,169 @@ export default {
   height: 600px;
   border-radius: 10px;
   background: white;
+}
+
+/* 右下角提醒样式 */
+.profile-reminder {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2000;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.profile-reminder ::v-deep .el-alert {
+  border-radius: 8px;
+}
+
+.profile-reminder ::v-deep .el-alert__content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.profile-reminder ::v-deep .el-alert__title {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.profile-reminder ::v-deep .el-button--text {
+  color: #409EFF;
+  font-weight: 600;
+}
+
+.profile-reminder ::v-deep .el-button--text:hover {
+  color: #66b1ff;
+}
+
+/* 用户须知弹窗样式 */
+::v-deep .user-notice-dialog {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+::v-deep .user-notice-dialog .el-dialog__header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px 24px;
+  border-bottom: none;
+}
+
+::v-deep .user-notice-dialog .el-dialog__title {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+::v-deep .user-notice-dialog .el-dialog__body {
+  padding: 24px;
+}
+
+::v-deep .user-notice-dialog .el-dialog__footer {
+  padding: 16px 24px;
+  border-top: 1px solid #EBEEF5;
+  text-align: center;
+}
+
+.notice-content {
+  color: #303133;
+}
+
+.notice-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #F0F2F5;
+}
+
+.notice-icon {
+  font-size: 28px;
+  color: #E6A23C;
+  margin-right: 12px;
+}
+
+.notice-title-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.notice-body {
+  line-height: 1.8;
+}
+
+.notice-intro {
+  font-size: 15px;
+  color: #606266;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.notice-list {
+  margin: 0 0 20px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice-list li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.notice-list-icon {
+  color: #67C23A;
+  font-size: 16px;
+  margin-right: 10px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.highlight-text {
+  color: #409EFF;
+  font-weight: 600;
+}
+
+.notice-warning {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #FEF0F0;
+  border: 1px solid #FDE2E2;
+  border-radius: 6px;
+  color: #F56C6C;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.notice-warning i {
+  font-size: 18px;
+  margin-right: 8px;
+}
+
+.notice-confirm-btn {
+  padding: 10px 30px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.notice-confirm-btn i {
+  margin-right: 6px;
 }
 </style>

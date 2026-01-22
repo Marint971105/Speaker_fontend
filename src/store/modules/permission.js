@@ -137,6 +137,7 @@
 //
 // export default permission
 import { constantRoutes, dynamicRoutes } from '@/router'
+import { hasMemberManagePermission } from '@/utils/permission-config'
 
 const permission = {
   state: {
@@ -155,19 +156,16 @@ const permission = {
   },
   actions: {
     // 生成路由
-    GenerateRoutes({ commit }, roles) {
+    GenerateRoutes({ commit, rootGetters }, roles) {
       return new Promise(resolve => {
-        let accessedRoutes
-
         console.log("Inside GenerateRoutes, roles:", roles);
+        
+        // 获取当前用户的 userId
+        const userId = rootGetters.userId
 
-        // 如果是admin角色，拥有所有路由的访问权限
-        if (roles.includes('admin')) {
-          accessedRoutes = dynamicRoutes
-        } else {
-          // 根据roleID过滤路由
-          accessedRoutes = filterAsyncRoutes(dynamicRoutes, roles)
-        }
+        // 所有角色都进行路由过滤，根据meta.roles判断权限，同时检查成员管理权限
+        const accessedRoutes = filterAsyncRoutes(dynamicRoutes, roles, userId)
+        
         console.log(" accessedRoutes:", JSON.parse(JSON.stringify(accessedRoutes)));
         // 将过滤后的路由添加到Vuex中
         commit('SET_ROUTES', accessedRoutes)
@@ -179,15 +177,15 @@ const permission = {
 }
 
 // 过滤路由，根据用户角色roleID判断是否有访问权限
-function filterAsyncRoutes(routes, roles) {
+function filterAsyncRoutes(routes, roles, userId) {
   const res = []
 
   routes.forEach(route => {
     const tmp = { ...route }
     // 判断当前路由是否符合用户的角色权限
-    if (hasPermission(roles, tmp)) {
+    if (hasPermission(roles, tmp, userId)) {
       if (tmp.children) {
-        tmp.children = filterAsyncRoutes(tmp.children, roles)
+        tmp.children = filterAsyncRoutes(tmp.children, roles, userId)
       }
       res.push(tmp)
     }
@@ -198,13 +196,28 @@ function filterAsyncRoutes(routes, roles) {
 }
 
 // 判断路由是否有权限访问
-function hasPermission(roles, route) {
+function hasPermission(roles, route, userId) {
+  // 首先检查角色权限
   if (route.meta && route.meta.roles) {
     // 如果路由中有roles属性，判断是否有相应的权限
-    return roles.some(role => route.meta.roles.includes(role))
-  } else {
-    return true
+    const hasRolePermission = roles.some(role => route.meta.roles.includes(role))
+    if (!hasRolePermission) {
+      return false
+    }
   }
+  
+  // 特殊处理：成员管理页面需要额外检查 userId 权限
+  if (route.path && route.path.includes('/memberManage')) {
+    // 检查用户是否有成员管理权限
+    if (!hasMemberManagePermission(userId)) {
+      // 如果没有权限，将路由隐藏（不显示在侧边栏）
+      route.hidden = true
+      // 仍然返回 true，让路由存在（用于路由守卫拦截）
+      return true
+    }
+  }
+  
+  return true
 }
 
 export default permission

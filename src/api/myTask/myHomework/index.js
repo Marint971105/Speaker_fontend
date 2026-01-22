@@ -33,7 +33,8 @@ export function uploadVideoTask(data) {
     url: '/file/uploadVideoTask',
     method: 'post',
     data,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 1200000 // 20分钟超时，支持大文件上传（400M+）
   });
 }
 
@@ -43,7 +44,8 @@ export function uploadAudioTask(data) {
     url: '/file/uploadAudioTask',
     method: 'post',
     data,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000 // 3分钟超时，音频文件中等大小
   });
 }
 
@@ -53,7 +55,8 @@ export function uploadWordTask(data) {
     url: '/file/uploadWordTask',
     method: 'post',
     data,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000 // 2分钟超时，Word文件相对较小
   });
 }
 
@@ -63,7 +66,8 @@ export function uploadPPTTask(data) {
     url: '/file/uploadPPTTask',
     method: 'post',
     data,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000 // 3分钟超时，PPT文件中等大小
   });
 }
 // 获取学生评分数据

@@ -7,39 +7,58 @@ export function checkHasMachineEvaluation(taskDetails) {
   }
   return taskDetails.evaluationMethods.includes('机评');
 }
-// 轮询函数
+// 智能轮询函数 - 使用递增间隔策略
 async function pollGradeResult(getGradeFunc, ...params) {
-  const MAX_TIMEOUT = 120 * 1000;      // 1分钟
-  const POLL_INTERVAL = 60 * 1000;    // 15秒
-  const MAX_ATTEMPTS = Math.floor(MAX_TIMEOUT / POLL_INTERVAL);  // 4次
+  const MAX_TIMEOUT = 600 * 1000;      // 10分钟总超时
+  const INITIAL_INTERVAL = 10 * 1000;  // 初始10秒间隔
+  const MAX_INTERVAL = 60 * 1000;      // 最大60秒间隔
+  const INTERVAL_MULTIPLIER = 1.2;     // 间隔递增倍数
 
   const startTime = Date.now();
+  let currentInterval = INITIAL_INTERVAL;
+  let attempt = 0;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    if (Date.now() - startTime >= MAX_TIMEOUT) {
-      throw new Error('评分超时（超过1分钟），请稍后在历史记录中查看结果');
-    }
+  while (Date.now() - startTime < MAX_TIMEOUT) {
+    attempt++;
+    console.log(`第${attempt}次尝试获取评分结果... (间隔: ${currentInterval/1000}秒)`);
+    
+    try {
+      const response = await getGradeFunc(...params);
 
-    console.log(`第${attempt + 1}次尝试获取评分结果...`);
-    const response = await getGradeFunc(...params);
+      if (response.code === 1) {
+        const evaluation = extractMachineEvaluation(response);
+        const hasFinishedEvaluation = Object.values(evaluation || {}).some(
+          item => item && item.finished && item.grade !== null
+        );
 
-    if (response.code === 1) {
-      const evaluation = extractMachineEvaluation(response);
-      const hasFinishedEvaluation = Object.values(evaluation || {}).some(
-        item => item && item.finished && item.grade !== null
-      );
-
-      if (hasFinishedEvaluation) {
-        console.log('获取到评分结果');
-        return response;  // 返回原始response，保持与原有逻辑一致
+        if (hasFinishedEvaluation) {
+          console.log('获取到评分结果');
+          return response;
+        }
+      }
+    } catch (error) {
+      // 如果是超时或网络错误，继续轮询
+      if (error.code === 'ECONNABORTED' || error.message.includes('504') || error.message.includes('timeout')) {
+        console.warn(`第${attempt}次尝试遇到网络问题，继续轮询...`);
+      } else {
+        // 其他错误直接抛出
+        throw error;
       }
     }
 
-    console.log(`等待${POLL_INTERVAL / 1000}秒后重试...`);
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+    // 检查是否还有时间继续轮询
+    if (Date.now() - startTime + currentInterval >= MAX_TIMEOUT) {
+      break;
+    }
+
+    console.log(`等待${currentInterval / 1000}秒后重试...`);
+    await new Promise(resolve => setTimeout(resolve, currentInterval));
+    
+    // 递增间隔时间，但不超过最大间隔
+    currentInterval = Math.min(currentInterval * INTERVAL_MULTIPLIER, MAX_INTERVAL);
   }
 
-  throw new Error('评分超时（超过1分钟），请稍后在历史记录中查看结果');
+  throw new Error('评分超时（超过10分钟），请稍后在历史记录中查看结果');
 }
 
 
@@ -52,7 +71,7 @@ export function getVideoGrade(stuId, taskId) {
       stuId,
       taskId
     },
-    timeout: 60000,  // 30秒超时
+    timeout: 600000,  // 10分钟超时
   })
 }
 
@@ -66,7 +85,7 @@ export function getPaperGrade(stuId, taskId, reviewType) {
       taskId,
       reviewType
     },
-    timeout: 60000,  // 30秒超时
+    timeout: 600000,  // 10分钟超时
   });
 }
 export function getSubmissionInfoById(submissionId) {
@@ -153,7 +172,13 @@ export async function fetchAllGrades(stuId, taskId, taskDetails) {
                 console.error('获取视频评分失败:', response.msg);
               }
             })
-            .catch(error => console.error('获取视频评分出错:', error))
+            .catch(error => {
+              console.error('获取视频评分出错:', error);
+              // 如果是超时或504错误，不影响其他评分的获取
+              if (error.code === 'ECONNABORTED' || error.message.includes('504') || error.message.includes('timeout')) {
+                console.warn('视频评分可能仍在处理中，将在后续轮询中重试');
+              }
+            })
         );
         break;
 
@@ -171,7 +196,12 @@ export async function fetchAllGrades(stuId, taskId, taskDetails) {
                 console.error('获取音频评分失败:', response.msg);
               }
             })
-            .catch(error => console.error('获取音频评分出错:', error))
+            .catch(error => {
+              console.error('获取音频评分出错:', error);
+              if (error.code === 'ECONNABORTED' || error.message.includes('504') || error.message.includes('timeout')) {
+                console.warn('音频评分可能仍在处理中，将在后续轮询中重试');
+              }
+            })
         );
         break;
 
@@ -189,7 +219,12 @@ export async function fetchAllGrades(stuId, taskId, taskDetails) {
                 console.error('获取演讲稿评分失败:', response.msg);
               }
             })
-            .catch(error => console.error('获取演讲稿评分出错:', error))
+            .catch(error => {
+              console.error('获取演讲稿评分出错:', error);
+              if (error.code === 'ECONNABORTED' || error.message.includes('504') || error.message.includes('timeout')) {
+                console.warn('演讲稿评分可能仍在处理中，将在后续轮询中重试');
+              }
+            })
         );
         break;
 
@@ -207,7 +242,12 @@ export async function fetchAllGrades(stuId, taskId, taskDetails) {
                 console.error('获取PPT评分失败:', response.msg);
               }
             })
-            .catch(error => console.error('获取PPT评分出错:', error))
+            .catch(error => {
+              console.error('获取PPT评分出错:', error);
+              if (error.code === 'ECONNABORTED' || error.message.includes('504') || error.message.includes('timeout')) {
+                console.warn('PPT评分可能仍在处理中，将在后续轮询中重试');
+              }
+            })
         );
         break;
 

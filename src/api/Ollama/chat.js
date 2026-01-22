@@ -3,7 +3,7 @@ import axios from 'axios'
 // 创建独立的 axios 实例
 const chatService = axios.create({
   // baseURL: 'http://10.120.48.67:8001',
-  baseURL: process.env.NODE_ENV === 'production' ? '/api/ai' : 'http://10.120.48.67:81/api/ai',
+  baseURL: process.env.NODE_ENV === 'production' ? '/api/ai' : 'http://localhost:8001/api/ai',
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json'
@@ -73,11 +73,121 @@ async function checkConnection() {
   }
 }
 
+// 智能裁剪对话历史，只保留关键消息以最大化可用tokens
+function smartTruncateMessages(messages, maxInputTokens = 5000) {
+  if (!messages || messages.length === 0) return messages
+  
+  // 估算当前 tokens
+  const estimatedTokens = Math.floor(JSON.stringify(messages).length * 0.3)
+  
+  console.log('对话历史估算tokens:', estimatedTokens)
+  
+  // 如果估算的 tokens 在安全范围内，直接返回
+  if (estimatedTokens <= maxInputTokens) {
+    return messages
+  }
+  
+  // 需要裁剪：只保留系统消息 + 最后一条用户消息
+  console.warn('⚠️ 对话历史过长，只保留系统消息和最新用户消息...')
+  
+  // 1. 找到系统消息
+  const systemMessages = messages.filter(msg => msg.role === 'system')
+  
+  // 2. 过滤掉系统消息后的对话
+  const conversationMessages = messages.filter(msg => msg.role !== 'system')
+  
+  // 3. 只保留最后一条用户消息（最新的对话）
+  const lastUserMessage = conversationMessages[conversationMessages.length - 1]
+  
+  // 如果最后一条不是用户消息，尝试找到最近的一条用户消息
+  let finalMessage = lastUserMessage
+  for (let i = conversationMessages.length - 1; i >= 0; i--) {
+    if (conversationMessages[i].role === 'user') {
+      finalMessage = conversationMessages[i]
+      break
+    }
+  }
+  
+  // 合并结果：系统消息 + 最后一条用户消息
+  let result = finalMessage ? [...systemMessages, finalMessage] : systemMessages
+  
+  // 4. 如果单个用户消息仍然太大，裁剪内容
+  const resultTokens = Math.floor(JSON.stringify(result).length * 0.3)
+  if (resultTokens > maxInputTokens && finalMessage) {
+    console.warn('⚠️ 用户消息过长，开始裁剪消息内容...')
+    
+    // 计算需要裁剪的字符数（假设每字符0.3 tokens）
+    const targetTokens = maxInputTokens * 0.6  // 给用户消息留60%的空间
+    const maxChars = Math.floor(targetTokens / 0.3)
+    
+    // 裁剪消息内容，但保留开头的prompt信息
+    const originalContent = finalMessage.content
+    const truncatedContent = originalContent.length > maxChars 
+      ? originalContent.substring(0, maxChars) + '\n\n[... 内容过长，已自动裁剪 ...]'
+      : originalContent
+    
+    result = [...systemMessages, {
+      ...finalMessage,
+      content: truncatedContent
+    }]
+    
+    console.log('内容裁剪完成:', {
+      原始长度: originalContent.length,
+      裁剪后长度: truncatedContent.length,
+      裁剪比例: `${Math.round((1 - truncatedContent.length / originalContent.length) * 100)}%`
+    })
+  }
+  
+  console.log('智能裁剪完成:', {
+    原始消息数: messages.length,
+    裁剪后消息数: result.length,
+    删除消息数: messages.length - result.length,
+    策略: '只保留系统消息和最新用户消息'
+  })
+  
+  return result
+}
+
 export function sendChatMessage(data) {
+  // 动态计算 max_tokens，确保永不超出上下文窗口
+  const contextWindowSize = 7000  // 模型的最大上下文长度
+  const absoluteMaxInputTokens = 5000  // 绝对最大输入，留出2000给输出
+  const safetyBuffer = 500  // 额外安全缓冲
+  const maxOutputTokens = 1500  // 最大输出 tokens
+  
+  // 1. 智能裁剪对话历史
+  let messages = data.conversation_messages || []
+  messages = smartTruncateMessages(messages, absoluteMaxInputTokens)
+  
+  // 2. 估算输入 tokens
+  const estimatedInputTokens = Math.floor(
+    JSON.stringify(messages).length * 0.3
+  )
+  
+  // 3. 双重保护：确保绝对不会超出上下文窗口
+  let finalInputTokens = estimatedInputTokens
+  if (finalInputTokens > contextWindowSize - safetyBuffer) {
+    // 如果仍然太大，强制裁剪到安全范围
+    console.error('⚠️ 输入仍然过大，强制裁剪到安全范围')
+    finalInputTokens = contextWindowSize - safetyBuffer
+  }
+  
+  // 4. 计算可用 tokens，确保至少留出安全缓冲
+  const availableTokens = contextWindowSize - finalInputTokens - safetyBuffer
+  const safeMaxTokens = Math.min(maxOutputTokens, Math.max(512, availableTokens))
+  
+  console.log('Token计算:', {
+    上下文窗口: contextWindowSize,
+    预估输入tokens: finalInputTokens,
+    安全缓冲: safetyBuffer,
+    可用输出tokens: safeMaxTokens,
+    策略: '永不超出上下文窗口，确保对话持续'
+  })
+  
   const requestData = {
-    model: "/mnt/mydisk/LLMs/LLM-Research/Meta-Llama-3.1-8B-Instruct",
-    messages: data.conversation_messages || [],
-    max_tokens: 4096,
+    model: "/root/autodl-tmp/mnt/LLMs/LLM-Research/Meta-Llama-3.1-8B-Instruct",
+    messages: messages,
+    max_tokens: safeMaxTokens,
     temperature: 0.7,
     top_p: 0.9
   }
@@ -101,10 +211,45 @@ export function sendChatMessage(data) {
 
 // 添加流式聊天方法
 export function sendStreamChatMessage(data, onChunk, onComplete, onError) {
+  // 动态计算 max_tokens，确保永不超出上下文窗口
+  const contextWindowSize = 7000  // 模型的最大上下文长度
+  const absoluteMaxInputTokens = 5000  // 绝对最大输入，留出2000给输出
+  const safetyBuffer = 500  // 额外安全缓冲
+  const maxOutputTokens = 1500  // 最大输出 tokens
+  
+  // 1. 智能裁剪对话历史
+  let messages = data.conversation_messages || []
+  messages = smartTruncateMessages(messages, absoluteMaxInputTokens)
+  
+  // 2. 估算输入 tokens
+  const estimatedInputTokens = Math.floor(
+    JSON.stringify(messages).length * 0.3
+  )
+  
+  // 3. 双重保护：确保绝对不会超出上下文窗口
+  let finalInputTokens = estimatedInputTokens
+  if (finalInputTokens > contextWindowSize - safetyBuffer) {
+    // 如果仍然太大，强制裁剪到安全范围
+    console.error('⚠️ 输入仍然过大，强制裁剪到安全范围')
+    finalInputTokens = contextWindowSize - safetyBuffer
+  }
+  
+  // 4. 计算可用 tokens，确保至少留出安全缓冲
+  const availableTokens = contextWindowSize - finalInputTokens - safetyBuffer
+  const safeMaxTokens = Math.min(maxOutputTokens, Math.max(512, availableTokens))
+  
+  console.log('Token计算:', {
+    上下文窗口: contextWindowSize,
+    预估输入tokens: finalInputTokens,
+    安全缓冲: safetyBuffer,
+    可用输出tokens: safeMaxTokens,
+    策略: '永不超出上下文窗口，确保对话持续'
+  })
+  
   const requestData = {
-    model: "/mnt/mydisk/LLMs/LLM-Research/Meta-Llama-3.1-8B-Instruct",
-    messages: data.conversation_messages || [],
-    max_tokens: 4096,
+    model: "/root/autodl-tmp/mnt/LLMs/LLM-Research/Meta-Llama-3.1-8B-Instruct",
+    messages: messages,
+    max_tokens: safeMaxTokens,
     temperature: 0.7,
     top_p: 0.9,
     stream: true // 启用流式响应

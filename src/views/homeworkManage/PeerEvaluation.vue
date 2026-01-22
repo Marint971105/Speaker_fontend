@@ -386,7 +386,7 @@ export default {
   watch: {
     activeTab: {
       handler(newTab) {
-        if (newTab === 'peer') {
+        if (newTab === 'peer' && this.assignedStudents.length > 0) {
           this.fetchPeerReviewAssignments()
         }
       },
@@ -394,8 +394,10 @@ export default {
     },
 
     assignedStudents: {
-      handler() {
-        this.fetchPeerReviewAssignments()
+      handler(newVal) {
+        if (newVal && newVal.length > 0) {
+          this.fetchPeerReviewAssignments()
+        }
         // 重置选择
         this.handleAllocationModeChange()
       },

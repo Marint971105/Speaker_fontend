@@ -52,6 +52,11 @@ export const constantRoutes = [
     hidden: true
   },
   {
+    path: '/qrcode-verify',
+    component: () => import('@/views/qrcode-verify'),
+    hidden: true
+  },
+  {
     path: '/404',
     component: () => import('@/views/error/404'),
     hidden: true
@@ -293,7 +298,8 @@ export const dynamicRoutes = [
     path: '/classManage/',
     component: Layout,
     hidden: false,
-    meta: { title: '班级管理', icon: 'peoples' },
+    redirect: '/classManage/teacher/index/',
+    meta: { title: '班级管理', icon: 'peoples', roles: ['admin', 'common'] },
     children: [
       {
         path: 'teacher/index/',
@@ -326,14 +332,14 @@ export const dynamicRoutes = [
     path: '/myTask/',
     component: Layout,
     hidden: false,
-    meta: { title: '我的任务', icon: 'job' },
+    meta: { title: '我的任务', icon: 'job', roles: ['admin', 'common'] },
     children: [
       {
         path: 'myEvaluation/index/',
         component: () => import('@/views/myTask/myEvaluation/index.vue'),
         name: 'myEvaluation/index/',
         hidden: false,
-        meta: { title: '我的评价', roles: ['common'], activeMenu: '/myTask/', icon: 'rate' },
+        meta: { title: '我的评价', roles: ['admin', 'common'], activeMenu: '/myTask/', icon: 'message' },
       },
       {
         path: '/myEvaluation/selfReview',
@@ -357,7 +363,7 @@ export const dynamicRoutes = [
         name: 'myEvaluation/teacherReview',
         hidden: true,
         props: (route) => route.query,
-        meta: { title: '师评', roles: ['common'], activeMenu: '/myTask/' },
+        meta: { title: '师评', roles: ['admin'], activeMenu: '/myTask/' },
       },
       {
         path: 'myHomework/index/',
@@ -389,11 +395,11 @@ export const dynamicRoutes = [
           return {
             taskId: route.query.taskId,
             submitId: route.query.submitId,
-            taskDetails: route.query.taskDetails ? JSON.parse(route.query.taskDetails) : {}
+            taskDetails: {} // 不再从query解析，组件内部会重新获取
           }
         },
         hidden: true,
-        meta: { title: '机评详情', roles: ['common'], activeMenu: '/myTask/myHomework/' }
+        meta: { title: '机评详情', roles: ['admin', 'common'], activeMenu: '/myTask/myHomework/' }
       },
       {
         path: 'myHomework/machineEvaluation/showSelfReview',
@@ -405,7 +411,7 @@ export const dynamicRoutes = [
           taskDetails: route.query.taskDetails ? JSON.parse(route.query.taskDetails) : {}
         }),
         hidden: true,
-        meta: { title: '自评详情', roles: ['common'], activeMenu: '/myTask/myHomework/' }
+        meta: { title: '自评详情', roles: ['admin', 'common'], activeMenu: '/myTask/myHomework/' }
       },
       {
         path: 'myHomework/machineEvaluation/showMutualReview',
@@ -417,7 +423,7 @@ export const dynamicRoutes = [
           taskDetails: route.query.taskDetails ? JSON.parse(route.query.taskDetails) : {}
         }),
         hidden: true,
-        meta: { title: '互评详情', roles: ['common'], activeMenu: '/myTask/myHomework/' }
+        meta: { title: '互评详情', roles: ['admin', 'common'], activeMenu: '/myTask/myHomework/' }
       },
       {
         path: 'myHomework/machineEvaluation/showTeacherReview',
@@ -429,7 +435,7 @@ export const dynamicRoutes = [
           taskDetails: route.query.taskDetails ? JSON.parse(route.query.taskDetails) : {}
         }),
         hidden: true,
-        meta: { title: '师评详情', roles: ['common'], activeMenu: '/myTask/myHomework/' }
+        meta: { title: '师评详情', roles: ['admin', 'common'], activeMenu: '/myTask/myHomework/' }
       }
     ],
   },
@@ -437,32 +443,32 @@ export const dynamicRoutes = [
     path: '/homeworkTrial/',
     component: Layout,
     hidden: false,
-    meta: { title: '特色功能', icon: 'star' },
+    meta: { title: '自主训练', icon: 'star', roles: ['admin', 'common'] },
     children: [
       {
         path: 'video/index',
         name: 'homeworkTrial_video',
         component: () => import('@/views/test/index.vue'),
-        meta: { title: '演讲视频智能评价', roles: ['common'], icon: 'monitor' }
+        meta: { title: '演讲视频智能评价', roles: ['admin', 'common'], icon: 'monitor' }
       },
       {
         path: 'video/analysis',
         name: 'homeworkTrial_video_analysis',
         component: () => import('@/views/test/AIAnalysisTest.vue'),
         hidden: true,
-        meta: { title: 'AI分析', roles: ['common'], icon: 'monitor', activeMenu: '/homeworkTrial/video/index' }
+        meta: { title: 'AI分析', roles: ['admin', 'common'], icon: 'monitor', activeMenu: '/homeworkTrial/video/index' }
       },
       {
         path: 'audio/index',
         name: 'homeworkTrial_audio',
         component: () => import('@/views/homeworkTrial/audio/index.vue'),
-        meta: { title: '英语语音智能评价', roles: ['common'], icon: 'phone' }
+        meta: { title: '英语语音智能评价', roles: ['admin', 'common'], icon: 'phone' }
       },
       {
         path: 'chat/index',
         name: 'homeworkTrial_chat',
         component: () => import('@/views/chat/index'),
-        meta: { title: '演讲稿智能写作', roles: ['common'], icon: 'edit' }
+        meta: { title: '演讲稿智能写作', roles: ['admin', 'common'], icon: 'edit' }
       }
     ]
   },

@@ -139,8 +139,12 @@ export default {
           this.open = false;
           this.options.img = process.env.VUE_APP_BASE_API + response.imgUrl;
           store.commit('SET_AVATAR', this.options.img);
-          this.$modal.msgSuccess("修改成功");
           this.visible = false;
+          // 显示提示弹窗
+          this.$alert('数据传输可能有延迟，请刷新查看', '提示', {
+            confirmButtonText: '确定',
+            type: 'info'
+          });
         });
       });
     },

@@ -33,7 +33,8 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row>
+        <!-- 作业附件功能已隐藏，暂时不使用 -->
+        <!-- <el-row>
           <el-col :span="12">
             <el-form-item label="作业附件:">
               <el-upload
@@ -50,7 +51,7 @@
               </el-upload>
             </el-form-item>
           </el-col>
-        </el-row>
+        </el-row> -->
         <el-row>
           <el-form-item label="提交内容:" required>
             <el-checkbox-group v-model="assignment.contentTypes" disabled>
@@ -73,7 +74,11 @@
         <el-tab-pane label="分配的学生信息" name="assigned">
          <el-table :data=" pagedAssignedStudents" style="width: 100%; margin-top: 10px;">
         <el-table-column prop="nickName" label="姓名" header-align="center" align="center"></el-table-column>
-        <el-table-column prop="userName" label="邮箱"  header-align="center" align="center"></el-table-column>
+        <el-table-column label="邮箱"  header-align="center" align="center">
+          <template slot-scope="scope">
+            {{ scope.row.userName && scope.row.userName.includes('@') ? scope.row.userName : '未设置' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="mobile" label="手机号"  header-align="center" align="center"></el-table-column>
         <el-table-column label="操作"  header-align="center" align="center">
           <template slot-scope="scope">
@@ -106,7 +111,7 @@
             <el-table-column prop="reviewerName" label="评阅人" header-align="center" align="center"></el-table-column>
             <el-table-column prop="audioGrade" label="音频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="pptGrade" label="PPT评分" header-align="center" align="center"></el-table-column>
-            <el-table-column prop="scriptGrade" label="演讲稿评分" header-align="center" align="center"></el-table-column>
+            <el-table-column prop="scriptGrade" label="文稿评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="videoGrade" label="视频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="totalGrade" label="总分" header-align="center" align="center"></el-table-column>
           </el-table>
@@ -132,7 +137,7 @@
             <el-table-column prop="reviewerName" label="评阅人" header-align="center" align="center"></el-table-column>
             <el-table-column prop="audioGrade" label="音频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="pptGrade" label="PPT评分" header-align="center" align="center"></el-table-column>
-            <el-table-column prop="scriptGrade" label="演讲稿评分" header-align="center" align="center"></el-table-column>
+            <el-table-column prop="scriptGrade" label="文稿评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="videoGrade" label="视频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="totalGrade" label="总分" header-align="center" align="center"></el-table-column>
           </el-table>
@@ -157,7 +162,7 @@
             <el-table-column prop="reviewerName" label="评阅人" header-align="center" align="center"></el-table-column>
             <el-table-column prop="audioGrade" label="音频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="pptGrade" label="PPT评分" header-align="center" align="center"></el-table-column>
-            <el-table-column prop="scriptGrade" label="演讲稿评分" header-align="center" align="center"></el-table-column>
+            <el-table-column prop="scriptGrade" label="文稿评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="videoGrade" label="视频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="totalGrade" label="总分" header-align="center" align="center"></el-table-column>
           </el-table>
@@ -184,7 +189,7 @@
             <el-table-column prop="reviewerName" label="评阅人" header-align="center" align="center"></el-table-column>
             <el-table-column prop="audioGrade" label="音频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="pptGrade" label="PPT评分" header-align="center" align="center"></el-table-column>
-            <el-table-column prop="scriptGrade" label="演讲稿评分" header-align="center" align="center"></el-table-column>
+            <el-table-column prop="scriptGrade" label="文稿评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="videoGrade" label="视频评分" header-align="center" align="center"></el-table-column>
             <el-table-column prop="totalGrade" label="总分" header-align="center" align="center"></el-table-column>
           </el-table>
@@ -216,7 +221,7 @@
         </el-row>
         <el-row>
           <el-col :span="12">
-            <p><strong>邮箱：</strong> {{ selectedStudent ? selectedStudent.userName : '' }}</p>
+            <p><strong>邮箱：</strong> {{ selectedStudent && selectedStudent.userName && selectedStudent.userName.includes('@') ? selectedStudent.userName : '未设置' }}</p>
           </el-col>
           <el-col :span="12">
             <p><strong>手机号：</strong> {{ selectedStudent ? selectedStudent.mobile : '' }}</p>

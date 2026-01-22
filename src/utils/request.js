@@ -15,7 +15,7 @@ axios.defaults.headers['Content-Type'] = 'application/json;charset=utf-8'
 // 创建axios实例
 const service = axios.create({
   // axios中请求配置有baseURL选项，表示请求URL公共部分
-  baseURL: process.env.VUE_APP_BASE_API || 'http://your-backend-url',  // 确保有正确的后端地址
+  baseURL: process.env.VUE_APP_BASE_API || '',  // 确保有正确的后端地址
   // 超时
   timeout: 10000
 })
@@ -29,6 +29,10 @@ service.interceptors.request.use(config => {
   const token = getToken();  // 获取存储的 token
   if (token) {
     config.headers['token'] = `${token}`;  // 将 token 添加到请求头
+  }
+  // 确保timeout配置被正确传递（如果请求中指定了timeout，使用请求中的值，否则使用默认值）
+  if (config.timeout === undefined) {
+    config.timeout = service.defaults.timeout || 10000;
   }
   // if (getToken() && !isToken) {
   //   config.headers['Authorization'] = 'Bearer '+ getToken() // 让每个请求携带自定义token 请根据实际情况自行修改
@@ -89,7 +93,8 @@ service.interceptors.response.use(res => {
     return res.data
   }
 
-  if (code === 401) {
+  // 检查code=401或msg中包含JWT expired/expired的情况
+  if (code === 401 || (msg && (msg.includes('JWT expired') || msg.includes('expired') || msg.includes('过期')))) {
     if (!isRelogin.show) {
       isRelogin.show = true;
       MessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { confirmButtonText: '重新登录', cancelButtonText: '取消', type: 'warning' }).then(() => {
@@ -118,12 +123,43 @@ service.interceptors.response.use(res => {
   error => {
     console.log('err' + error)
     let { message } = error;
-    if (message == "Network Error") {
+    
+    // 检查HTTP状态码401（未授权）
+    if (error.response && error.response.status === 401) {
+      if (!isRelogin.show) {
+        isRelogin.show = true;
+        MessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { confirmButtonText: '重新登录', cancelButtonText: '取消', type: 'warning' }).then(() => {
+          isRelogin.show = false;
+          store.dispatch('FedLogOut').then(() => {
+            location.href = '/index';
+          })
+        }).catch(() => {
+          isRelogin.show = false;
+        });
+      }
+      message = "登录状态已过期，请重新登录";
+    } else if (message == "Network Error") {
       message = "后端接口连接异常";
     } else if (message.includes("timeout")) {
       message = "系统接口请求超时";
     } else if (message.includes("Request failed with status code")) {
-      message = "系统接口" + message.substr(message.length - 3) + "异常";
+      const statusCode = message.substr(message.length - 3);
+      if (statusCode === '401') {
+        message = "登录状态已过期，请重新登录";
+        if (!isRelogin.show) {
+          isRelogin.show = true;
+          MessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { confirmButtonText: '重新登录', cancelButtonText: '取消', type: 'warning' }).then(() => {
+            isRelogin.show = false;
+            store.dispatch('FedLogOut').then(() => {
+              location.href = '/index';
+            })
+          }).catch(() => {
+            isRelogin.show = false;
+          });
+        }
+      } else {
+        message = "系统接口" + statusCode + "异常";
+      }
     }
     Message({ message: message, type: 'error', duration: 5 * 1000 })
     return Promise.reject(error)

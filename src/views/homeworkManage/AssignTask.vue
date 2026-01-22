@@ -16,7 +16,15 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="截止日期:">
-              <span>{{ formatDate(taskData.deadline) }}</span>
+              <el-date-picker
+                v-model="deadlineValue"
+                type="datetime"
+                placeholder="选择截止日期"
+                format="yyyy-MM-dd HH:mm:ss"
+                value-format="yyyy-MM-dd HH:mm:ss"
+                @change="handleDeadlineChange"
+                style="width: 100%;"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -24,7 +32,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="提交类型:">
-              <span>{{ taskData.submissionTypes && taskData.submissionTypes.join('、') }}</span>
+              <span>{{ formatSubmissionTypes(taskData.submissionTypes) }}</span>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -43,6 +51,30 @@
           <el-col :span="12">
             <el-form-item label="作业描述:">
               <div v-html="taskData.taskRequirements"></div>
+              <div style="margin-top: 5px;">
+                <span style="color: #909399; font-size: 12px;">需填写作业描述以区分相同名称的不同作业</span>
+              </div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <!-- 作业附件上传 -->
+        <el-row :gutter="20">
+          <el-col :span="24">
+            <el-form-item label="作业附件:">
+              <el-upload
+                class="upload-demo"
+                :file-list="attachmentFileList"
+                :on-preview="handlePreview"
+                :on-remove="handleRemove"
+                :before-upload="beforeUpload"
+                :http-request="handleCustomUpload"
+                multiple
+                :limit="10"
+                :show-file-list="true"
+              >
+                <el-button size="small" type="primary">点击上传附件</el-button>
+                <div slot="tip" class="el-upload__tip">支持上传多个附件，单个文件不超过100MB</div>
+              </el-upload>
             </el-form-item>
           </el-col>
         </el-row>
@@ -90,6 +122,7 @@
           <set-evaluation-dimensions
             :task-id="taskId"
             :disabled="!hasAssignedStudents"
+            :has-assigned-students="hasAssignedStudents"
           />
         </el-tab-pane>
 
@@ -150,7 +183,8 @@ import SetEvaluationDimensions from './SetEvaluationDimensions.vue'
 import SelfEvaluation from './SelfEvaluation.vue'
 import PeerEvaluation from './PeerEvaluation.vue'
 import TeacherEvaluation from './TeacherEvaluation.vue'
-import {getTaskInfoById} from '@/api/homeworkManage/assignTask'
+import {getTaskInfoById, updateTaskAttachments, updateTaskDeadline} from '@/api/homeworkManage/assignTask'
+import {getClassMembers} from '@/api/classManage/teacher'
 export default {
   name: 'AssignTask',
 
@@ -172,11 +206,15 @@ export default {
       // 新增属性用于保存班级和学生数据
       classData: {
         classList: [],
-        originalStudentList: [],
+        originalStudentList: [], // 当前班级的学生列表
+        allStudentsList: [], // 所有已加载班级的学生列表（用于跨班级查找）
         selectedClassId: '',
         assignedStudentIds: new Set()
       },
-      submitting: false
+      submitting: false,
+      attachmentFileList: [], // 附件列表
+      deadlineValue: null, // 截止日期值
+      deadlineSaving: false // 截止日期保存状态
     }
   },
   watch: {
@@ -311,19 +349,41 @@ export default {
       console.log('更新前的数据:', this.classData)
       console.log('接收的新数据:', newData)
 
+      // 如果更新了学生列表，需要合并到所有学生列表中
+      if (newData.originalStudentList && newData.originalStudentList.length > 0) {
+        const existingAllStudents = this.classData.allStudentsList || []
+        const newStudents = newData.originalStudentList
+        
+        // 合并学生列表，避免重复
+        const mergedStudents = [...existingAllStudents]
+        newStudents.forEach(newStudent => {
+          const exists = mergedStudents.find(s => s.id === newStudent.id)
+          if (!exists) {
+            mergedStudents.push(newStudent)
+          } else {
+            // 更新已存在的学生信息（可能分配状态有变化）
+            const index = mergedStudents.findIndex(s => s.id === newStudent.id)
+            mergedStudents[index] = { ...newStudent }
+          }
+        })
+        
+        this.classData.allStudentsList = mergedStudents
+      }
+
       this.classData = {
         ...this.classData,
         classList: newData.classList || this.classData.classList,
         originalStudentList: newData.originalStudentList || this.classData.originalStudentList,
         selectedClassId: newData.selectedClassId || this.classData.selectedClassId,
-        assignedStudentIds: newData.assignedStudentIds || this.classData.assignedStudentIds
+        assignedStudentIds: newData.assignedStudentIds || this.classData.assignedStudentIds,
+        allStudentsList: this.classData.allStudentsList || []
       }
 
       console.log('更新后的数据:', this.classData)
       console.groupEnd()
 
       // 如果学生列表更新了，重新计算已分配学生信息
-      if (newData.originalStudentList) {
+      if (newData.originalStudentList || newData.assignedStudentIds) {
         this.updateAssignedStudentsInfo()
       }
     },
@@ -337,6 +397,20 @@ export default {
           const assignedStudents = response.data.assignedStudents || []
           this.hasAssignedStudents = !!(response.data.assignedStudents && response.data.assignedStudents.length)
           this.classData.assignedStudentIds = new Set(response.data.assignedStudents || [])
+          // 更新截止日期值
+          if (this.taskData.deadline) {
+            // 将后端返回的日期字符串转换为日期选择器需要的格式
+            const deadlineDate = new Date(this.taskData.deadline)
+            const year = deadlineDate.getFullYear()
+            const month = String(deadlineDate.getMonth() + 1).padStart(2, '0')
+            const day = String(deadlineDate.getDate()).padStart(2, '0')
+            const hours = String(deadlineDate.getHours()).padStart(2, '0')
+            const minutes = String(deadlineDate.getMinutes()).padStart(2, '0')
+            const seconds = String(deadlineDate.getSeconds()).padStart(2, '0')
+            this.deadlineValue = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+          }
+          // 加载附件列表
+          this.loadAttachmentFiles()
           console.group('刷新分配状态')
           console.log('更新后的任务数据:', this.taskData)
           console.log('已分配学生数量:', assignedStudents.length)
@@ -350,14 +424,84 @@ export default {
       }
     },
     // 更新已分配学生的完整信息
-    updateAssignedStudentsInfo() {
-      // 从 originalStudentList 中筛选出已分配的学生
-      this.assignedStudentsInfo = this.classData.originalStudentList.filter(student =>
+    async updateAssignedStudentsInfo() {
+      // 优先从所有已加载的学生列表中查找（包含所有班级的学生）
+      const allStudents = this.classData.allStudentsList || []
+      
+      // 从所有学生列表中筛选出已分配的学生
+      let assignedStudents = allStudents.filter(student =>
         this.classData.assignedStudentIds.has(student.id)
       )
+      
+      // 如果从已加载列表中找不到所有已分配学生，尝试从后端获取
+      if (assignedStudents.length < this.classData.assignedStudentIds.size) {
+        try {
+          const response = await getTaskInfoById(this.taskId)
+          if (response.code === 1 && response.data && response.data.assignedStudents) {
+            const assignedIds = response.data.assignedStudents || []
+            
+            // 如果已加载列表中没有某些学生，需要获取这些学生的详细信息
+            const missingIds = assignedIds.filter(id => 
+              !allStudents.find(s => s.id === id)
+            )
+            
+            if (missingIds.length > 0) {
+              // 从所有班级中查找缺失的学生
+              const allClassIds = this.classData.classList.map(c => c.classId)
+              for (const classId of allClassIds) {
+                try {
+                  const studentsResponse = await getClassMembers({
+                    classId: classId,
+                    page: 1,
+                    pageSize: 10000
+                  })
+                  
+                  if (studentsResponse?.data?.rows) {
+                    const classStudents = studentsResponse.data.rows.map(student => ({
+                      id: student.userId,
+                      studentId: student.studentId,
+                      name: student.nickName,
+                      className: this.classData.classList.find(c => c.classId === classId)?.className || '',
+                      email: student.userName,
+                      mobile: student.mobile,
+                      school: student.school,
+                      major: student.major,
+                      dept: student.dept,
+                      sex: student.sex,
+                      isAssigned: this.classData.assignedStudentIds.has(student.userId)
+                    }))
+                    
+                    // 添加到所有学生列表
+                    classStudents.forEach(s => {
+                      if (!allStudents.find(existing => existing.id === s.id)) {
+                        allStudents.push(s)
+                      }
+                    })
+                  }
+                } catch (error) {
+                  console.warn(`获取班级 ${classId} 的学生失败:`, error)
+                }
+              }
+              
+              // 更新所有学生列表
+              this.classData.allStudentsList = allStudents
+              
+              // 重新筛选已分配学生
+              assignedStudents = allStudents.filter(student =>
+                this.classData.assignedStudentIds.has(student.id)
+              )
+            }
+          }
+        } catch (error) {
+          console.error('获取已分配学生信息失败:', error)
+        }
+      }
+      
+      this.assignedStudentsInfo = assignedStudents
 
       // 打印日志查看
       console.group('父组件 - 已分配学生信息更新')
+      console.log('已分配学生ID数量:', this.classData.assignedStudentIds.size)
       console.log('已分配学生数量:', this.assignedStudentsInfo.length)
       console.log('已分配学生详细信息:', this.assignedStudentsInfo)
       console.groupEnd()
@@ -376,10 +520,14 @@ export default {
 // 检查评价维度是否设置
     checkEvaluationDimensions(taskData) {
       const { evaluationMethods, evaluationDimensions } = taskData
+      // 如果 evaluationDimensions 为 null 或 undefined，返回 false
+      if (!evaluationDimensions || !Array.isArray(evaluationDimensions)) {
+        return false
+      }
       // 检查每个评价方法是否都有对应的维度设置
       return evaluationMethods.every(method => {
         const dimensions = evaluationDimensions.find(d => d.evaluationMethods === method)
-        return dimensions && dimensions.evaluationTypes.length > 0
+        return dimensions && dimensions.evaluationTypes && dimensions.evaluationTypes.length > 0
       })
     },
     // 检查互评分配
@@ -403,6 +551,123 @@ export default {
     // 检查学生分配
     checkStudentAssignment(taskData) {
       return taskData.assignedStudents && taskData.assignedStudents.length > 0
+    },
+    
+    // 加载附件列表
+    loadAttachmentFiles() {
+      if (this.taskData.attachmentFiles && this.taskData.attachmentFiles.length > 0) {
+        this.attachmentFileList = this.taskData.attachmentFiles.map((storedPath, index) => {
+          // 从attachmentFileNames映射中获取原始文件名，如果没有则使用存储路径的文件名
+          const originalName = (this.taskData.attachmentFileNames && this.taskData.attachmentFileNames[storedPath]) 
+            ? this.taskData.attachmentFileNames[storedPath]
+            : storedPath.split('/').pop() || storedPath
+          return {
+            name: originalName, // 显示原始文件名
+            url: storedPath, // 存储路径用于下载
+            uid: Date.now() + index,
+            status: 'success' // 设置为success状态，确保显示删除按钮
+          }
+        })
+      } else {
+        this.attachmentFileList = []
+      }
+    },
+    
+    // 文件预览/下载
+    async handlePreview(file) {
+      try {
+        const storedPath = file.url || file.name
+        // 从attachmentFileNames映射中获取原始文件名
+        const originalFileName = (this.taskData && this.taskData.attachmentFileNames && this.taskData.attachmentFileNames[storedPath])
+          ? this.taskData.attachmentFileNames[storedPath]
+          : storedPath.split('/').pop() || 'file'
+        
+        // 直接调用file-service的接口（8082端口）
+        const fileServiceUrl = `http://localhost:8082/file/showFile?fileType=teacherTask&fileName=${encodeURIComponent(storedPath)}`
+        
+        // 使用axios下载文件，添加token认证
+        const axios = require('axios')
+        const response = await axios.get(fileServiceUrl, {
+          responseType: 'blob',
+          timeout: 60000,
+          headers: {
+            'token': this.$store.getters.token || ''
+          }
+        })
+        
+        // 创建blob对象并下载
+        const blob = new Blob([response.data])
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', originalFileName)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        this.$message.success('文件下载成功')
+      } catch (error) {
+        console.error('下载附件失败:', error)
+        this.$message.error('下载附件失败，请稍后重试')
+      }
+    },
+    
+    // 文件移除
+    async handleRemove(file, fileList) {
+      this.attachmentFileList = fileList
+      // 计算要保留的文件路径（已存在的文件，不包括新上传但未保存的）
+      const keepFilePaths = fileList
+        .filter(f => f.url) // 只保留已有URL的文件（已保存的文件）
+        .map(f => f.url)
+      
+      // 新上传的文件（还没有URL的）
+      const newFiles = fileList
+        .filter(f => f.raw && !f.url)
+        .map(f => f.raw)
+      
+      try {
+        // 传递要保留的文件路径和新上传的文件
+        await updateTaskAttachments(this.taskId, newFiles, keepFilePaths)
+        this.$message.success('已移除附件')
+        // 刷新附件列表
+        await this.refreshAssignmentStatus()
+      } catch (error) {
+        console.error('移除附件失败:', error)
+        this.$message.error('移除附件失败')
+      }
+    },
+    
+    // 上传前验证
+    beforeUpload(file) {
+      const isValidSize = file.size / 1024 / 1024 < 100
+      if (!isValidSize) {
+        this.$message.error('文件大小不能超过100MB')
+        return false
+      }
+      return true
+    },
+    
+    // 自定义上传
+    async handleCustomUpload(options) {
+      const { file } = options
+      try {
+        // 获取当前已保存的文件路径（不包括新上传的文件）
+        const keepFilePaths = this.attachmentFileList
+          .filter(f => f.url && !f.raw) // 只保留已保存的文件
+          .map(f => f.url)
+        
+        const response = await updateTaskAttachments(this.taskId, [file], keepFilePaths)
+        if (response.code === 1) {
+          this.$message.success('附件上传成功')
+          // 刷新附件列表
+          await this.refreshAssignmentStatus()
+        } else {
+          this.$message.error(response.msg || '附件上传失败')
+        }
+      } catch (error) {
+        this.$message.error('附件上传失败，请重试')
+        console.error('上传失败:', error)
+      }
     },
 
     // 提交任务设置
@@ -458,9 +723,59 @@ export default {
       } finally {
         this.submitting = false
       }
+    },
+
+    // 格式化提交类型，将"演讲稿"显示为"文稿"
+    formatSubmissionTypes(submissionTypes) {
+      if (!submissionTypes || !Array.isArray(submissionTypes)) {
+        return '';
+      }
+      return submissionTypes.map(type => type === '演讲稿' ? '文稿' : type).join('、');
+    },
+    
+    // 处理截止日期变更
+    async handleDeadlineChange(value) {
+      if (!value) {
+        return
+      }
+      
+      // 检查日期是否改变
+      if (this.taskData.deadline) {
+        const oldDeadline = new Date(this.taskData.deadline).getTime()
+        const newDeadline = new Date(value).getTime()
+        if (oldDeadline === newDeadline) {
+          return // 日期没有改变，不需要保存
+        }
+      }
+      
+      this.deadlineSaving = true
+      try {
+        const response = await updateTaskDeadline(this.taskId, value)
+        if (response.code === 1) {
+          this.$message.success('截止日期更新成功')
+          // 刷新任务数据
+          await this.refreshAssignmentStatus()
+        } else {
+          throw new Error(response.msg || '更新失败')
+        }
+      } catch (error) {
+        console.error('更新截止日期失败:', error)
+        this.$message.error('更新截止日期失败：' + (error.message || '未知错误'))
+        // 恢复原值
+        if (this.taskData.deadline) {
+          const deadlineDate = new Date(this.taskData.deadline)
+          const year = deadlineDate.getFullYear()
+          const month = String(deadlineDate.getMonth() + 1).padStart(2, '0')
+          const day = String(deadlineDate.getDate()).padStart(2, '0')
+          const hours = String(deadlineDate.getHours()).padStart(2, '0')
+          const minutes = String(deadlineDate.getMinutes()).padStart(2, '0')
+          const seconds = String(deadlineDate.getSeconds()).padStart(2, '0')
+          this.deadlineValue = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+        }
+      } finally {
+        this.deadlineSaving = false
+      }
     }
-
-
 
   }
 }
@@ -498,11 +813,11 @@ export default {
 /* 其他原有样式保持不变... */
 
 /* 使用Vue2的深度选择器修改tab-pane的样式 */
-/deep/ .el-tabs__content {
+::v-deep .el-tabs__content {
   overflow: visible !important;
 }
 
-/deep/ .el-tab-pane {
+::v-deep .el-tab-pane {
   width: 100%;
   min-width: 1200px;
   overflow-x: auto;

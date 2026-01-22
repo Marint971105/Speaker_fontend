@@ -1982,7 +1982,11 @@ export default {
         console.log('🔍 [DEBUG] 视频文件类型:', videoBlob.type)
         
         // 使用新的API接口进行焦虑分析
-        const apiUrl = 'http://10.120.48.67:5000/api/predict_from_video'
+        // 根据环境动态选择API地址
+        const isDevelopment = process.env.NODE_ENV === 'development'
+        const apiUrl = isDevelopment 
+          ? 'http://localhost:5000/api/predict_from_video'
+          : `${window.location.origin}/api/anxiety/predict_from_video`
         console.log('🔍 [DEBUG] 发送请求到:', apiUrl)
         
         const analysisResponse = await axios.post(apiUrl, formData, {

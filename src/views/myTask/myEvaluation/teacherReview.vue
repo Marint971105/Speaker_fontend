@@ -31,14 +31,34 @@
           <!-- 第一行：视频和评分维度 -->
           <div class="first-row">
             <!-- 左侧视频播放区域 -->
-            <div class="video-section" v-loading="loading.video">
-              <video
-                ref="videoElement"
-                controls
-                class="video-player"
-                :src="fileUrls.video"
-                @error="handleFileError('video')"
-              ></video>
+            <div class="video-section">
+              <div class="video-wrapper">
+                <video
+                  ref="videoElement"
+                  controls
+                  class="video-player"
+                  :src="fileUrls.video"
+                  @loadstart="handleVideoLoadStart"
+                  @waiting="handleVideoWaiting"
+                  @canplay="handleVideoCanPlay"
+                  @canplaythrough="handleVideoCanPlay"
+                  @error="handleFileError('video')"
+                ></video>
+                <!-- 自定义加载遮罩层 -->
+                <div v-if="loading.video" class="custom-loading-overlay">
+                  <div class="loading-content">
+                    <div class="loading-spinner">
+                      <i class="el-icon-loading"></i>
+                    </div>
+                    <div class="loading-text">视频加载中...</div>
+                    <div class="loading-dots">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- 右侧评分维度区域 -->
@@ -64,8 +84,10 @@
                     >
                       <span>{{ info }}</span>
                       <el-rate
-                        v-model="ratings.video[index][infoIndex]"
+                        :value="(ratings.video && ratings.video[index]) ? ratings.video[index][infoIndex] : 0"
                         :max="5"
+                        allow-half
+                        @change="(value) => handleRatingChange('video', index, infoIndex, value)"
                       ></el-rate>
                     </div>
                   </div>
@@ -107,7 +129,17 @@
                 <div class="score-submit">
                   <div class="score-container">
                     <span class="score-label">视频总分：</span>
-                    <el-input class="score-input" :value="calculateTotalScore('video')" readonly></el-input>
+                    <el-input
+                      v-model="manualScores.video"
+                      type="number"
+                      :min="0"
+                      :max="100"
+                      size="small"
+                      class="score-input"
+                      :placeholder="calculateTotalScore('video').toString()"
+                      @blur="handleScoreChange('video')"
+                      @input="validateScore('video', $event)"
+                    ></el-input>
                     <span class="score-unit">分</span>
                   </div>
                   <el-button
@@ -125,7 +157,7 @@
           <!-- 第一行：音频和评分维度 -->
           <div class="first-row">
             <!-- 左侧音频播放区域 -->
-            <div class="audio-section" v-loading="loading.audio">  <!-- 可以复用video-section的样式 -->
+            <div class="audio-section" v-loading="loading.audio" element-loading-text="音频加载中..." element-loading-spinner="el-icon-loading">  <!-- 可以复用video-section的样式 -->
               <div class="audio-player-container">
                 <!-- 音频播放器背景 -->
                 <div class="audio-bg">
@@ -146,6 +178,10 @@
                   controls
                   class="audio-player"
                   :src="fileUrls.audio"
+                  @loadstart="handleAudioLoadStart"
+                  @waiting="handleAudioWaiting"
+                  @canplay="handleAudioCanPlay"
+                  @canplaythrough="handleAudioCanPlay"
                   @play="handlePlay"
                   @pause="handlePause"
                   @ended = 'handlePause'
@@ -177,8 +213,10 @@
                     >
                       <span>{{ info }}</span>
                       <el-rate
-                        v-model="ratings.audio[index][infoIndex]"
+                        :value="(ratings.audio && ratings.audio[index]) ? ratings.audio[index][infoIndex] : 0"
                         :max="5"
+                        allow-half
+                        @change="(value) => handleRatingChange('audio', index, infoIndex, value)"
                       ></el-rate>
                     </div>
                   </div>
@@ -220,7 +258,17 @@
                 <div class="score-submit">
                   <div class="score-container">
                     <span class="score-label">音频总分：</span>
-                    <el-input class="score-input" :value="calculateTotalScore('audio')" readonly></el-input>
+                    <el-input
+                      v-model="manualScores.audio"
+                      type="number"
+                      :min="0"
+                      :max="100"
+                      size="small"
+                      class="score-input"
+                      :placeholder="calculateTotalScore('audio').toString()"
+                      @blur="handleScoreChange('audio')"
+                      @input="validateScore('audio', $event)"
+                    ></el-input>
                     <span class="score-unit">分</span>
                   </div>
                   <el-button
@@ -238,7 +286,7 @@
           <div class="content-wrapper">
             <!-- 左侧 PPT 展示区域 -->
             <div class="left-section">
-              <div class="ppt-document-section" v-loading="loading.ppt">
+              <div class="ppt-document-section" v-loading="loading.ppt" element-loading-text="PPT加载中..." element-loading-spinner="el-icon-loading">
                 <pdf-viewer
                   v-if="pdfData"
                   :pdf-data="pdfData"
@@ -272,8 +320,10 @@
                       >
                         <span>{{ info }}</span>
                         <el-rate
-                          v-model="ratings.ppt[index][infoIndex]"
+                            :value="(ratings.ppt && ratings.ppt[index]) ? ratings.ppt[index][infoIndex] : 0"
                           :max="5"
+                            allow-half
+                            @change="(value) => handleRatingChange('ppt', index, infoIndex, value)"
                         ></el-rate>
                       </div>
                     </div>
@@ -300,7 +350,17 @@
                   <div class="score-submit">
                     <div class="score-container">
                       <span class="score-label">PPT总分：</span>
-                      <el-input class="score-input" :value="calculateTotalScore('ppt')" readonly></el-input>
+                      <el-input
+                        v-model="manualScores.ppt"
+                        type="number"
+                        :min="0"
+                        :max="100"
+                        size="small"
+                        class="score-input"
+                        :placeholder="calculateTotalScore('ppt').toString()"
+                        @blur="handleScoreChange('ppt')"
+                        @input="validateScore('ppt', $event)"
+                      ></el-input>
                       <span class="score-unit">分</span>
                     </div>
                     <el-button
@@ -319,8 +379,8 @@
           <div class="content-wrapper">
             <!-- 左侧 Word 展示区域 -->
             <div class="left-section">
-              <div class="word-document-section"  v-loading="loading.word || convertLoading"
-                   element-loading-text="正在转换文档...">
+              <div class="word-document-section" v-loading="loading.word || convertLoading"
+                   element-loading-text="文稿加载中..." element-loading-spinner="el-icon-loading">
                 <!-- Word 文档内容 -->
                 <div v-if="wordContent" class="word-content">
                   <div v-html="wordContent"></div>
@@ -364,8 +424,10 @@
                       >
                         <span>{{ info }}</span>
                         <el-rate
-                          v-model="ratings.word[index][infoIndex]"
+                            :value="(ratings.word && ratings.word[index]) ? ratings.word[index][infoIndex] : 0"
                           :max="5"
+                            allow-half
+                            @change="(value) => handleRatingChange('word', index, infoIndex, value)"
                         ></el-rate>
                       </div>
                     </div>
@@ -391,8 +453,18 @@
                   <!-- 评分总分和按钮 -->
                   <div class="score-submit">
                     <div class="score-container">
-                      <span class="score-label">演讲稿总分：</span>
-                      <el-input class="score-input" :value="calculateTotalScore('word')" readonly></el-input>
+                      <span class="score-label">文稿总分：</span>
+                      <el-input
+                        v-model="manualScores.word"
+                        type="number"
+                        :min="0"
+                        :max="100"
+                        size="small"
+                        class="score-input"
+                        :placeholder="calculateTotalScore('word').toString()"
+                        @blur="handleScoreChange('word')"
+                        @input="validateScore('word', $event)"
+                      ></el-input>
                       <span class="score-unit">分</span>
                     </div>
                     <el-button
@@ -414,7 +486,7 @@
 
 
 <script>
-import { getTaskInfoById, submitEvaluation ,getSubmissionsByStuId,showFile} from "@/api/myTask/myEvaluation/index";
+import { getTaskInfoById, submitEvaluation ,getSubmissionsByStuId,showFile, getEvaluationByTaskIdAndStuId} from "@/api/myTask/myEvaluation/index";
 import * as echarts from 'echarts';
 import { Loading } from 'element-ui';
 import mammoth from 'mammoth';
@@ -474,6 +546,12 @@ export default {
         audio: "",
         ppt: "",
         word: "",
+      },
+      manualScores: {
+        video: null, // 手动输入的总分
+        audio: null,
+        ppt: null,
+        word: null,
       },
       typeMapping: {
         '视频': 'video',
@@ -620,7 +698,7 @@ export default {
 
       if (!isCurrentComplete) {
         this.$message({
-          message: '请完成所有评分项并填写评语',
+          message: '请完成所有评分项',
           type: 'warning',
           duration: 2000
         });
@@ -646,9 +724,15 @@ export default {
     initializeEvaluationData(data) {
       if (!data?.evaluationDimensions) return;
 
-      const evaluation = data.evaluationDimensions.find(
-        (item) => item?.evaluationMethods === "自评"
+      // 师评页面应该查找"师评"的评价维度，如果没有则查找第一个可用的
+      let evaluation = data.evaluationDimensions.find(
+        (item) => item?.evaluationMethods === "师评"
       );
+      
+      // 如果没有找到师评，尝试查找第一个可用的评价维度
+      if (!evaluation && data.evaluationDimensions.length > 0) {
+        evaluation = data.evaluationDimensions[0];
+      }
 
       if (evaluation?.evaluationTypes) {
         evaluation.evaluationTypes.forEach((type) => {
@@ -658,8 +742,8 @@ export default {
             // 初始化评价维度
             this.$set(this.evaluationData, key, type.evaluationTitles || []);
 
-            // 初始化评分数据
-            const dimensionRatings = type.evaluationTitles.map((dimension) =>
+            // 初始化评分数据（确保每个维度都有对应的评分数组）
+            const dimensionRatings = (type.evaluationTitles || []).map((dimension) =>
               dimension.evaluationInfos ? Array(dimension.evaluationInfos.length).fill(0) : []
             );
             this.$set(this.ratings, key, dimensionRatings);
@@ -671,8 +755,133 @@ export default {
       }
     },
 
+    // 加载已有的师评数据
+    async loadExistingEvaluation() {
+      try {
+        const response = await getEvaluationByTaskIdAndStuId(this.taskId, this.studentId);
+        
+        console.log('加载已有评分数据:', response);
+        
+        if (response.code === 1 && response.data) {
+          // 查找师评数据
+          const teacherReview = response.data.evaluationTypes.find(
+            type => type.evaluationMethod === '师评'
+          );
+          
+          console.log('找到师评数据:', teacherReview);
+          
+          if (teacherReview && teacherReview.evaluationContents) {
+            // 遍历每个评价内容（视频、音频、PPT、演讲稿）
+            teacherReview.evaluationContents.forEach(content => {
+              const key = this.typeMapping[content.evaluationContent];
+              
+              console.log(`处理 ${content.evaluationContent}:`, content);
+              
+              // 只有在评价已完成时才加载数据（finished === true）
+              // 如果 finished === false，说明评价已被重置，不应该加载旧数据
+              if (key && content.finished === true) {
+                // 加载评语 - 评语存储在 evaluationTitle 字段中
+                if (content.evaluationTitle) {
+                  this.$set(this.comments, key, content.evaluationTitle);
+                  console.log(`加载评语 ${key}:`, content.evaluationTitle);
+                }
+                
+                // 加载手动输入的总分 - 总分存储在 grade 字段中
+                if (content.grade !== null && content.grade !== undefined) {
+                  const gradeValue = Number(content.grade);
+                  this.$set(this.manualScores, key, gradeValue);
+                  // 立即更新维度分数
+                  const chineseType = Object.keys(this.typeMapping).find(k =>
+                    this.typeMapping[k] === key
+                  );
+                  if (chineseType) {
+                    this.$set(this.dimensionScores, chineseType, gradeValue);
+                  }
+                  console.log(`加载总分 ${key}:`, content.grade);
+                }
+                
+                // 加载评分数据
+                if (content.evaluationDimensions && content.evaluationDimensions.length > 0) {
+                  const evaluationData = this.evaluationData[key];
+                  if (evaluationData && evaluationData.length > 0) {
+                    // 重新构建 ratings 数组
+                    const newRatings = evaluationData.map((dimension, dimensionIndex) => {
+                      const dimensionRatings = [];
+                      
+                      if (dimension.evaluationInfos) {
+                        dimension.evaluationInfos.forEach((info, infoIndex) => {
+                          // 从 evaluationDimensions 中查找对应的评分
+                          const evalDim = content.evaluationDimensions.find(dim => {
+                            // evaluationDimensions 是一个对象数组，每个对象的 key 是评价维度名
+                            return dim.hasOwnProperty(info);
+                          });
+                          
+                          if (evalDim && evalDim[info]) {
+                            dimensionRatings.push(Number(evalDim[info]));
+                          } else {
+                            dimensionRatings.push(0);
+                          }
+                        });
+                      }
+                      
+                      return dimensionRatings;
+                    });
+                    
+                    console.log(`设置评分 ${key}:`, newRatings);
+                    this.$set(this.ratings, key, newRatings);
+                  }
+                }
+              } else if (key && content.finished === false) {
+                // 如果评价未完成（可能是重置后），清空该类型的数据
+                console.log(`评价 ${content.evaluationContent} 未完成，清空数据`);
+                this.$set(this.comments, key, '');
+                this.$set(this.manualScores, key, null);
+                this.$set(this.ratings, key, []);
+                const chineseType = Object.keys(this.typeMapping).find(k =>
+                  this.typeMapping[k] === key
+                );
+                if (chineseType) {
+                  this.$set(this.dimensionScores, chineseType, null);
+                }
+              }
+            });
+            
+            // 更新所有维度分数
+            this.submissionTypes.forEach(type => {
+              this.updateDimensionScore(type);
+            });
+            
+            console.log('最终 ratings:', this.ratings);
+            console.log('最终 comments:', this.comments);
+            
+            // 更新雷达图
+            this.$nextTick(() => {
+              Object.keys(this.radarCharts).forEach(chartType => {
+                this.updateRadarChart(chartType);
+              });
+            });
+          }
+        }
+      } catch (error) {
+        console.error('加载已有评分数据失败:', error);
+        // 不显示错误提示，保持静默失败，使用初始化的空数据
+      }
+    },
 
     calculateTotalScore(type) {
+      // 如果手动输入了总分，优先使用手动输入的值
+      if (this.manualScores[type] !== null && this.manualScores[type] !== undefined) {
+        const score = this.manualScores[type];
+        const chineseType = Object.keys(this.typeMapping).find(key =>
+          this.typeMapping[key] === type
+        );
+        if (chineseType) {
+          this.$set(this.dimensionScores, chineseType, score);
+        }
+        return score;
+      }
+      
+      // 否则根据星星评分计算总分
       if (!this.ratings[type] || !this.ratings[type].length) return 0;
       const totalScore = this.ratings[type]
         .flat()
@@ -693,6 +902,99 @@ export default {
       }
 
       return score;
+    },
+    
+    // 验证分数输入
+    validateScore(type, value) {
+      if (value === '' || value === null || value === undefined) {
+        // 清空输入框时，设置为 null，让 watcher 根据星星评分更新
+        this.$set(this.manualScores, type, null);
+        // 立即根据星星评分更新分数显示
+        this.$nextTick(() => {
+          const calculatedScore = this.calculateTotalScore(type);
+          this.$set(this.manualScores, type, calculatedScore);
+        });
+        return;
+      }
+      
+      const numValue = Number(value);
+      if (isNaN(numValue)) {
+        this.$set(this.manualScores, type, null);
+        // 立即根据星星评分更新分数显示
+        this.$nextTick(() => {
+          const calculatedScore = this.calculateTotalScore(type);
+          this.$set(this.manualScores, type, calculatedScore);
+        });
+        return;
+      }
+      
+      // 限制在 0-100 范围内
+      if (numValue < 0) {
+        this.$set(this.manualScores, type, 0);
+      } else if (numValue > 100) {
+        this.$set(this.manualScores, type, 100);
+      } else {
+        this.$set(this.manualScores, type, Math.round(numValue));
+      }
+    },
+    
+    // 处理星星评分变化
+    handleRatingChange(type, dimensionIndex, infoIndex, value) {
+      // 确保 ratings[type] 存在
+      if (!this.ratings[type]) {
+        this.$set(this.ratings, type, []);
+      }
+      
+      // 确保 ratings[type][dimensionIndex] 存在
+      if (!this.ratings[type][dimensionIndex]) {
+        this.$set(this.ratings[type], dimensionIndex, []);
+      }
+      
+      // 更新评分值
+      this.$set(this.ratings[type][dimensionIndex], infoIndex, value);
+      
+      // 直接根据星星评分计算总分并更新显示
+      if (!this.ratings[type] || !this.ratings[type].length) {
+        this.$set(this.manualScores, type, 0);
+        return;
+      }
+      
+      const totalScore = this.ratings[type]
+        .flat()
+        .reduce((sum, score) => sum + score, 0);
+      const itemCount = this.ratings[type].flat().length;
+      const calculatedScore = itemCount > 0 ? Math.round((totalScore / (itemCount * 5)) * 100) : 0;
+      
+      // 强制更新 manualScores 以显示在输入框中（覆盖手动输入的值）
+      this.$set(this.manualScores, type, calculatedScore);
+      
+      // 更新维度分数和雷达图
+      const chineseType = Object.keys(this.typeMapping).find(key =>
+        this.typeMapping[key] === type
+      );
+      if (chineseType) {
+        this.$set(this.dimensionScores, chineseType, calculatedScore);
+        // 更新所有雷达图
+        this.$nextTick(() => {
+          Object.keys(this.radarCharts).forEach(chartType => {
+            this.updateRadarChart(chartType);
+          });
+        });
+      }
+    },
+    
+    // 处理总分变化
+    handleScoreChange(type) {
+      const chineseType = Object.keys(this.typeMapping).find(key =>
+        this.typeMapping[key] === type
+      );
+      if (chineseType && this.manualScores[type] !== null && this.manualScores[type] !== undefined) {
+        this.$set(this.dimensionScores, chineseType, this.manualScores[type]);
+        // 更新雷达图
+        Object.keys(this.radarCharts).forEach(chartType => {
+          this.updateRadarChart(chartType);
+        });
+      }
     },
 
     saveCurrentTabEvaluation() {
@@ -717,17 +1019,18 @@ export default {
     checkTypeComplete(type) {
       const key = this.typeMapping[type];
 
-      // 检查星星评分
+      // 如果手动输入了总分，则不需要完成星星评分
+      if (this.manualScores[key] !== null && this.manualScores[key] !== undefined) {
+        return true;
+      }
+
+      // 否则检查星星评分是否完成
       const hasAllRatings = this.ratings[key] &&
         this.ratings[key].every(dimensionRatings =>
           dimensionRatings.every(stars => stars > 0 && stars <= 5)
         );
 
-      // 检查评语
-      const hasComment = this.comments[key] &&
-        this.comments[key].trim().length > 0;
-
-      return hasAllRatings && hasComment;
+      return hasAllRatings;
     },
     // 检查所有评分是否完整
     checkAllEvaluationsComplete() {
@@ -738,7 +1041,7 @@ export default {
       if (incompleteTypes.length > 0) {
         this.$message.warning(
           `以下内容的评分未完成：${incompleteTypes.join('、')}\n` +
-          '请确保：\n1. 所有评分维度都已评星\n2. 已填写评语'
+          '请确保所有评分维度都已评分'
         );
         return false;
       }
@@ -785,34 +1088,81 @@ export default {
 
           // Get the evaluation dimensions data for this type
           const dimensionsData = this.evaluationData[key];
+          
+          // 安全检查：确保 dimensionsData 存在且是数组
+          if (!dimensionsData || !Array.isArray(dimensionsData)) {
+            console.warn(`评价维度数据不存在或无效: ${type} (key: ${key})`);
+            return {
+              evaluationContent: type,
+              finished: true,
+              evaluationTitle: this.comments[key] || '',
+              grade: this.manualScores[key] || 0,
+              evaluationDimensions: []
+            };
+          }
 
           // Create evaluationDimensions array with proper naming
           const evaluationDimensions = [];
           dimensionsData.forEach((dimension, dimensionIndex) => {
-            dimension.evaluationInfos.forEach((info, infoIndex) => {
-              // Use the actual evaluation info text as the key
-              const rating = this.ratings[key][dimensionIndex][infoIndex];
-              evaluationDimensions.push({
-                [info]: rating // Use the actual evaluation content as key
+            // 确保 evaluationInfos 存在且是数组
+            if (dimension.evaluationInfos && Array.isArray(dimension.evaluationInfos)) {
+              dimension.evaluationInfos.forEach((info, infoIndex) => {
+                // 确保 info 是字符串类型，如果不是则跳过
+                if (typeof info !== 'string' || !info || info.trim() === '') {
+                  console.warn(`跳过无效的评价维度: ${info}, 类型: ${typeof info}`);
+                  return;
+                }
+                // Use the actual evaluation info text as the key
+                // 安全检查：确保 ratings 数组存在且长度足够
+                let rating = 0;
+                if (this.ratings[key] && 
+                    Array.isArray(this.ratings[key]) &&
+                    this.ratings[key][dimensionIndex] &&
+                    Array.isArray(this.ratings[key][dimensionIndex]) &&
+                    infoIndex < this.ratings[key][dimensionIndex].length &&
+                    this.ratings[key][dimensionIndex][infoIndex] !== undefined) {
+                  rating = this.ratings[key][dimensionIndex][infoIndex];
+                }
+                // 确保 rating 是数字类型
+                const ratingValue = typeof rating === 'number' ? rating : (typeof rating === 'string' ? parseFloat(rating) : 0);
+                evaluationDimensions.push({
+                  [info]: String(ratingValue) // 后端期望 Map<String,String>，所以转换为字符串
+                });
               });
-            });
+            } else {
+              console.warn(`评价维度 ${dimension.evaluationTitle} 的 evaluationInfos 无效:`, dimension.evaluationInfos);
+            }
           });
+
+          // 使用手动输入的总分（如果有），否则使用计算的总分
+          const finalScore = this.manualScores[key] !== null && this.manualScores[key] !== undefined 
+            ? this.manualScores[key] 
+            : this.calculateTotalScore(key);
 
           return {
             evaluationContent: type,
             finished: true,
             evaluationTitle: this.comments[key],
-            grade: this.calculateTotalScore(key),
+            grade: finalScore,
             evaluationDimensions
           };
         });
 
+        // 确保 stuId 和 reviewerId 是数字类型
+        const stuIdNum = typeof this.studentId === 'string' ? parseInt(this.studentId, 10) : this.studentId;
+        const reviewerIdNum = typeof this.reviewerId === 'string' ? parseInt(this.reviewerId, 10) : this.reviewerId;
+        
+        // 验证转换是否成功
+        if (isNaN(stuIdNum) || isNaN(reviewerIdNum)) {
+          throw new Error(`无效的ID值: studentId=${this.studentId}, reviewerId=${this.reviewerId}`);
+        }
+        
         const submitData = {
           taskId: this.taskId,
-          stuId: this.studentId, // Get from props or store
+          stuId: stuIdNum, // 确保是数字类型
           evaluationType: {
             evaluationMethod: "师评",
-            reviewerId: this.reviewerId, // Get from props or store
+            reviewerId: reviewerIdNum, // 确保是数字类型
             evaluationContents
           }
         };
@@ -981,7 +1331,6 @@ export default {
 
         for (const type of this.submissionTypes) {
           const typeKey = this.typeMapping[type];
-          this.loading[typeKey] = true;
 
           try {
 
@@ -1001,8 +1350,36 @@ export default {
             }
 
             if (fileInfo.fileName) {
+              // 对于视频和音频，在文件下载开始前就设置loading，确保用户能看到加载提示
+              if (typeKey === 'video' || typeKey === 'audio') {
+                // 先设置loading状态，确保遮罩层立即显示
+                this.loading[typeKey] = true;
+                // 等待DOM更新，确保加载遮罩立即显示（避免黑屏）
+                await this.$nextTick();
+              } else {
+                // 对于其他类型，在下载开始时设置loading
+                this.loading[typeKey] = true;
+              }
 
-              const response = await showFile(typeKey, fileInfo.fileName);
+              let response;
+              try {
+                response = await showFile(typeKey, fileInfo.fileName);
+                
+                // 检查响应是否为有效的Blob
+                if (!(response instanceof Blob)) {
+                  throw new Error('文件下载失败：响应不是有效的文件流');
+                }
+                
+                // 检查文件大小（如果为空可能是错误响应）
+                if (response.size === 0) {
+                  throw new Error('文件下载失败：文件为空');
+                }
+              } catch (error) {
+                console.error(`文件下载失败 (${type}):`, error);
+                this.$message.error(`${type}文件下载失败，请检查网络连接或联系管理员`);
+                this.loading[typeKey] = false;
+                continue;
+              }
 
               // 根据文件类型设置正确的 MIME 类型
               const mimeType = this.getMimeType(typeKey, fileInfo.fileName);
@@ -1012,8 +1389,33 @@ export default {
               if (typeKey === 'word') {
                 this.convertLoading = true;
                 try {
+                  // 验证文件大小（错误页面通常很小）
+                  if (response.size < 100) {
+                    throw new Error('文件下载失败：文件大小异常，可能是错误响应');
+                  }
+                  
+                  // 将Blob转换为ArrayBuffer（mammoth需要ArrayBuffer）
+                  const arrayBuffer = await response.arrayBuffer();
+                  
+                  // 验证文件头（Word文档是zip格式，文件头应该是PK，即0x50 0x4B）
+                  const uint8Array = new Uint8Array(arrayBuffer);
+                  if (uint8Array.length < 4 || uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
+                    // 如果不是zip文件头，可能是错误响应（HTML错误页面）
+                    const textDecoder = new TextDecoder();
+                    const text = textDecoder.decode(uint8Array.slice(0, Math.min(500, uint8Array.length)));
+                    console.error('文件头验证失败，响应内容预览:', text.substring(0, 200));
+                    
+                    if (text.includes('403') || text.includes('Forbidden') || text.includes('Token') || text.includes('token')) {
+                      throw new Error('Token验证失败，请重新登录');
+                    } else if (text.includes('404') || text.includes('Not Found') || text.includes('not found')) {
+                      throw new Error('文件未找到');
+                    } else {
+                      throw new Error('文件格式错误：不是有效的Word文档（.docx文件应该是zip格式）');
+                    }
+                  }
+                  
                   const result = await mammoth.convertToHtml(
-                    {arrayBuffer: response},
+                    {arrayBuffer: arrayBuffer},
                     {
                       styleMap: [
                         "p[style-name='Title'] => h1:fresh",
@@ -1028,21 +1430,25 @@ export default {
                   this.wordContent = result.value;
 
                   // 仍然创建 Blob，保持与其他文件类型一致的处理逻辑
-                  const blob = new Blob([response], {type: mimeType});
+                  const blob = new Blob([arrayBuffer], {type: mimeType});
                   const url = URL.createObjectURL(blob);
                   this._blobUrls = this._blobUrls || [];
                   this._blobUrls.push(url);
                   this.$set(this.fileUrls, typeKey, url);
                 } catch (error) {
                   console.error('Word conversion failed:', error);
-                  this.$message.error('Word文档转换失败');
+                  console.error('Response size:', response.size);
+                  console.error('Response type:', response.type);
+                  this.$message.error('Word文档转换失败：' + (error.message || '未知错误'));
                   this.wordContent = '';
                 } finally {
                   this.convertLoading = false;
+                  this.loading[typeKey] = false;
                 }
               } else if (typeKey === 'ppt') {
                 // 直接使用PDF数据
                 this.pdfData = response;
+                this.loading[typeKey] = false;
               } else {
                 // 创建 Blob 对象
                 const blob = new Blob([response], {type: mimeType});
@@ -1052,22 +1458,37 @@ export default {
                 this._blobUrls = this._blobUrls || [];
                 this._blobUrls.push(url);
 
-                // 更新文件 URL
-                this.$set(this.fileUrls, typeKey, url);
-
                 // 更新视图元素
                 const element = this.$refs[`${typeKey}Element`];
                 if (element) {
-                  element.src = url;
+                  // 对于视频和音频，loading状态已经在下载前设置，这里直接设置src
+                  if (typeKey === 'video' || typeKey === 'audio') {
+                    // 先直接设置element.src（避免Vue响应式更新导致video元素重新渲染出现黑屏）
+                    element.src = url;
+                    // 再次等待DOM更新，确保element.src的设置已经生效
+                    await this.$nextTick();
+                    // 然后再更新fileUrls（此时video已经有src了，Vue的更新不会触发重新加载）
+                    this.$set(this.fileUrls, typeKey, url);
+                  } else {
+                    // 其他类型直接设置src和URL
+                    element.src = url;
+                    this.$set(this.fileUrls, typeKey, url);
+                    this.loading[typeKey] = false;
+                  }
+                  // 对于视频和音频，等待媒体元素加载完成后再关闭loading
+                  // loading状态会在 @canplay 事件中关闭
+                } else {
+                  // 如果没有对应的元素引用，直接更新URL并关闭loading
+                  this.$set(this.fileUrls, typeKey, url);
+                  this.loading[typeKey] = false;
                 }
               }
             }
 
           } catch (err) {
             console.error(`Error loading ${type} file:`, err);
-            // this.$message.error(`${type}文件加载失败`);
-          } finally {
             this.loading[typeKey] = false;
+            // this.$message.error(`${type}文件加载失败`);
           }
         }
 
@@ -1100,6 +1521,58 @@ export default {
       this.loading[type] = false;
       // this.$message.error(`${type}文件加载失败`);
     },
+
+    // 处理视频加载开始
+    handleVideoLoadStart() {
+      this.loading.video = true;
+    },
+
+    // 处理视频等待缓冲
+    handleVideoWaiting() {
+      this.loading.video = true;
+    },
+
+    // 处理视频可以播放（加载完成）
+    handleVideoCanPlay() {
+      // 延迟一点关闭loading，确保视频真正可以播放
+      this.$nextTick(() => {
+        const video = this.$refs.videoElement;
+        if (video && video.readyState >= 3) { // HAVE_FUTURE_DATA 或更高
+          this.loading.video = false;
+        } else {
+          // 如果还没准备好，继续等待
+          setTimeout(() => {
+            this.loading.video = false;
+          }, 500);
+        }
+      });
+    },
+
+    // 处理音频加载开始
+    handleAudioLoadStart() {
+      this.loading.audio = true;
+    },
+
+    // 处理音频等待缓冲
+    handleAudioWaiting() {
+      this.loading.audio = true;
+    },
+
+    // 处理音频可以播放（加载完成）
+    handleAudioCanPlay() {
+      // 延迟一点关闭loading，确保音频真正可以播放
+      this.$nextTick(() => {
+        const audio = this.$refs.audioElement;
+        if (audio && audio.readyState >= 3) { // HAVE_FUTURE_DATA 或更高
+          this.loading.audio = false;
+        } else {
+          // 如果还没准备好，继续等待
+          setTimeout(() => {
+            this.loading.audio = false;
+          }, 500);
+        }
+      });
+    },
     // 清理Blob URLs
     clearBlobUrls() {
       this._blobUrls.forEach(url => URL.revokeObjectURL(url));
@@ -1117,6 +1590,58 @@ export default {
 
 
   },
+  watch: {
+    // 监听星星评分变化，实时更新分数显示
+    ratings: {
+      handler(newRatings, oldRatings) {
+        // 如果 oldRatings 不存在（初始化时），跳过
+        if (!oldRatings) return;
+        
+        // 遍历所有评分类型
+        Object.keys(newRatings).forEach(type => {
+          const newTypeRatings = newRatings[type];
+          const oldTypeRatings = oldRatings[type];
+          
+          // 检查该类型的评分是否有变化
+          const newStr = JSON.stringify(newTypeRatings);
+          const oldStr = JSON.stringify(oldTypeRatings);
+          
+          if (newStr !== oldStr) {
+            // 当星星评分变化时，总是根据星星评分更新分数显示
+            // 直接根据星星评分计算总分（不依赖 manualScores）
+            if (!newTypeRatings || !newTypeRatings.length) {
+              this.$set(this.manualScores, type, 0);
+              return;
+            }
+            const totalScore = newTypeRatings
+              .flat()
+              .reduce((sum, score) => sum + score, 0);
+            const itemCount = newTypeRatings.flat().length;
+            const calculatedScore = itemCount > 0 ? Math.round((totalScore / (itemCount * 5)) * 100) : 0;
+            
+            // 强制更新 manualScores 以显示在输入框中（覆盖手动输入的值）
+            this.$set(this.manualScores, type, calculatedScore);
+            
+            // 更新维度分数和雷达图
+            const chineseType = Object.keys(this.typeMapping).find(key =>
+              this.typeMapping[key] === type
+            );
+            if (chineseType) {
+              this.$set(this.dimensionScores, chineseType, calculatedScore);
+              // 更新所有雷达图
+              this.$nextTick(() => {
+                Object.keys(this.radarCharts).forEach(chartType => {
+                  this.updateRadarChart(chartType);
+                });
+              });
+            }
+          }
+        });
+      },
+      deep: true, // 深度监听，监听数组内部变化
+      immediate: false // 不在初始化时触发
+    }
+  },
   async created() {
     await this.fetchTaskData().then(() => {
       if (!this.activeTab) {
@@ -1131,6 +1656,9 @@ export default {
         this.initRadarChart(this.activeTab);
       });
     });
+
+    // 加载已有的师评数据
+    await this.loadExistingEvaluation();
 
     await this.loadFiles();
   },
@@ -1198,11 +1726,122 @@ export default {
   max-width: 45%;
 }
 
-.video-player {
+/* 视频包装器 */
+.video-wrapper {
+  position: relative;
   width: 100%;
   height: 400px;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.video-player {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   background: #000;
+}
+
+/* 自定义加载遮罩层 - 非常醒目 */
+.custom-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  /* 移除淡入动画，确保遮罩层立即完全不透明，避免任何可能的黑屏 */
+  opacity: 1;
+}
+
+/* 加载内容容器 */
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* 加载动画图标 */
+.loading-spinner {
+  font-size: 60px;
+  color: #409EFF;
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 加载文字 */
+.loading-text {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  letter-spacing: 2px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* 加载点动画 */
+.loading-dots {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.loading-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #409EFF;
+  animation: bounce 1.4s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(64, 158, 255, 0.6);
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.7;
+  }
+  40% {
+    transform: translateY(-15px) scale(1.2);
+    opacity: 1;
+  }
 }
 .audio-section{
   flex: 1;
@@ -1370,6 +2009,7 @@ export default {
 }
 
 
+
 /* 第二行布局 */
 .second-row {
   display: flex;
@@ -1435,7 +2075,7 @@ export default {
   line-height: 1; /* 确保文本与输入框垂直居中 */
 }
 .score-input {
-  width: 100px; /* 固定输入框宽度 */
+  width: 120px; /* 固定输入框宽度 */
   height: 32px; /* 确保与其他表单元素高度一致 */
   line-height: 1;
   font-size: 12px;

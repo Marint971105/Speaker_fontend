@@ -7,13 +7,13 @@
       <!-- 左侧：原有的登录卡片 -->
       <div class="login-card-container">
         <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
-        <img src="@/assets/logo/logo4.png" alt="Utalk Logo" class="logo-img">
+        <img src="@/assets/logo/new_logo.jpg" alt="Utalk Logo" class="logo-img">
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
             type="text"
             auto-complete="off"
-            placeholder="账号"
+            placeholder="手机号/学号"
             class="input-custom"
           >
             <svg-icon slot="prefix" icon-class="user" class="el-input__icon input-icon" />
@@ -33,6 +33,11 @@
         </el-form-item>
         <el-checkbox v-model="loginForm.rememberMe" class="checkbox-custom">记住密码</el-checkbox>
       </el-form>
+      
+      <!-- 忘记密码链接 -->
+      <div class="forgot-password-wrapper">
+        <el-link type="primary" @click="showForgotPasswordDialog" class="forgot-password-link">忘记密码？</el-link>
+      </div>
       
       <!-- 将按钮移到 el-form 外部，避免 Element UI 样式干扰 -->
       <div class="login-buttons-wrapper">
@@ -57,7 +62,7 @@
       </div>
       
         <div class="register-link-wrapper" v-if="register">
-          <router-link class="link-type" :to="'/register'">立即注册</router-link>
+          <router-link class="link-type" :to="{ path: '/register', query: classId ? { classId: classId } : {} }">立即注册</router-link>
         </div>
       </div>
       
@@ -84,6 +89,97 @@
         </el-button>
       </div>
     </div>
+    
+    <!-- 忘记密码对话框 -->
+    <el-dialog
+      title="忘记密码"
+      :visible.sync="forgotPasswordDialogVisible"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-steps :active="forgotPasswordStep" finish-status="success" align-center style="margin-bottom: 30px;">
+        <el-step title="输入学号"></el-step>
+        <el-step title="验证身份"></el-step>
+        <el-step title="重置密码"></el-step>
+      </el-steps>
+      
+      <!-- 第一步：输入学号 -->
+      <div v-if="forgotPasswordStep === 0">
+        <el-form :model="forgotPasswordForm" :rules="forgotPasswordRules" ref="forgotPasswordForm" label-width="100px">
+          <el-form-item label="学号" prop="studentId">
+            <el-input
+              v-model="forgotPasswordForm.studentId"
+              placeholder="请输入学号"
+              @keyup.enter.native="handleCheckIdentity"
+            ></el-input>
+          </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+          <el-button @click="forgotPasswordDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleCheckIdentity" :loading="checkingIdentity">下一步</el-button>
+        </div>
+      </div>
+      
+      <!-- 第二步：验证身份 -->
+      <div v-if="forgotPasswordStep === 1">
+        <el-alert
+          v-if="!userIdentityInfo.hasMobile"
+          type="error"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 20px;"
+        >
+          <div slot="title">
+            <p>该用户未绑定手机号，无法通过此方式重置密码</p>
+          </div>
+        </el-alert>
+        <el-form v-if="userIdentityInfo.hasMobile" :model="forgotPasswordForm" :rules="forgotPasswordRules" ref="identityForm" label-width="100px">
+          <el-form-item label="姓名" prop="nickName">
+            <el-input
+              v-model="forgotPasswordForm.nickName"
+              placeholder="请输入姓名"
+            ></el-input>
+          </el-form-item>
+          <el-form-item label="手机号" prop="mobile">
+            <el-input
+              v-model="forgotPasswordForm.mobile"
+              placeholder="请输入完整手机号"
+              maxlength="11"
+            ></el-input>
+          </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+          <el-button @click="forgotPasswordStep = 0">上一步</el-button>
+          <el-button v-if="userIdentityInfo.hasMobile" type="primary" @click="handleVerifyIdentity" :loading="verifyingIdentity">下一步</el-button>
+        </div>
+      </div>
+      
+      <!-- 第三步：重置密码 -->
+      <div v-if="forgotPasswordStep === 2">
+        <el-form :model="forgotPasswordForm" :rules="forgotPasswordRules" ref="resetPasswordForm" label-width="100px">
+          <el-form-item label="新密码" prop="newPassword">
+            <el-input
+              v-model="forgotPasswordForm.newPassword"
+              type="password"
+              placeholder="请输入新密码"
+              show-password
+            ></el-input>
+          </el-form-item>
+          <el-form-item label="确认密码" prop="confirmPassword">
+            <el-input
+              v-model="forgotPasswordForm.confirmPassword"
+              type="password"
+              placeholder="请再次输入新密码"
+              show-password
+            ></el-input>
+          </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+          <el-button @click="forgotPasswordStep = 1">上一步</el-button>
+          <el-button type="primary" @click="handleResetPassword" :loading="resettingPassword">重置密码</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -91,6 +187,7 @@
 // import { getCodeImg } from "@/api/login";
 import Cookies from "js-cookie";
 import { encrypt, decrypt } from '@/utils/jsencrypt'
+import { checkUserIdentity, resetPasswordByIdentity } from '@/api/login'
 
 export default {
   name: "Login",
@@ -105,7 +202,7 @@ export default {
       },
       loginRules: {
         username: [
-          { required: true, trigger: "blur", message: "请输入您的账号" }
+          { required: true, trigger: "blur", message: "请输入手机号或学号" }
         ],
         password: [
           { required: true, trigger: "blur", message: "请输入您的密码" }
@@ -117,7 +214,43 @@ export default {
       captchaEnabled: false,
       // 注册开关
       register: true,
-      redirect: undefined
+      redirect: undefined,
+      // 扫码进班相关
+      classId: null,  // 从URL获取的班级ID，用于扫码进班功能
+      // 忘记密码相关
+      forgotPasswordDialogVisible: false,
+      forgotPasswordStep: 0, // 0: 输入学号, 1: 验证身份, 2: 重置密码
+      forgotPasswordForm: {
+        studentId: '',
+        nickName: '',
+        mobile: '',
+        newPassword: '',
+        confirmPassword: ''
+      },
+      forgotPasswordRules: {
+        studentId: [
+          { required: true, message: '请输入学号', trigger: 'blur' }
+        ],
+        nickName: [
+          { required: true, message: '请输入姓名', trigger: 'blur' }
+        ],
+        mobile: [
+          { required: true, message: '请输入手机号', trigger: 'blur' },
+          { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+        ],
+        newPassword: [
+          { required: true, message: '请输入新密码', trigger: 'blur' },
+          { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+        ],
+        confirmPassword: [
+          { required: true, message: '请再次输入新密码', trigger: 'blur' },
+          { validator: this.validateConfirmPassword, trigger: 'blur' }
+        ]
+      },
+      userIdentityInfo: {}, // 用户身份信息
+      checkingIdentity: false,
+      verifyingIdentity: false,
+      resettingPassword: false
     };
   },
   watch: {
@@ -131,6 +264,21 @@ export default {
   created() {
     // this.getCode();
     this.getCookie();
+    
+    // 检查URL中是否有classId参数（扫码进班场景）
+    this.classId = this.$route.query.classId;
+    if (this.classId) {
+      console.log('检测到扫码进班，班级ID:', this.classId);
+      
+      // 检查用户是否已登录
+      const token = this.$store.getters.token;
+      if (token) {
+        console.log('用户已登录，尝试自动加入班级');
+        this.autoJoinClass();
+      } else {
+        console.log('用户未登录，显示登录页面');
+      }
+    }
   },
   methods: {
     // getCode() {
@@ -166,8 +314,15 @@ export default {
             Cookies.remove('rememberMe');
           }
           this.$store.dispatch("Login", this.loginForm).then(() => {
+            // 登录成功后检查是否有classId（扫码进班场景）
+            if (this.classId) {
+              console.log('登录成功，准备加入班级:', this.classId);
+              return this.autoJoinClass();
+            } else {
+              // 普通登录，正常跳转
             console.log("Redirecting to: ", this.redirect || "/");
             this.$router.push({ path: this.redirect || "/" }).catch(err => console.error(err));
+            }
           }).catch((error) => {
             console.log("Full Error: ", JSON.stringify(error, null, 2));  // 打印完整的错误信息
             if (error.response) {
@@ -185,6 +340,13 @@ export default {
     },
     // 添加统一认证登录方法
     handleCasLogin() {
+      // 【关键】CAS登录前，如果有classId，保存到sessionStorage
+      // 因为CAS跳转会丢失URL参数，需要用sessionStorage桥接
+      if (this.classId) {
+        sessionStorage.setItem('pendingClassId', this.classId);
+        console.log('CAS登录前，已保存 classId 到 sessionStorage:', this.classId);
+      }
+      
       const casLoginUrl = process.env.VUE_APP_CAS_LOGIN_URL
       
       // 按照 RFC2396 标准编码保留字符
@@ -198,15 +360,141 @@ export default {
       }
       
       // 使用与后端完全相同的 service URL
-      const serviceUrl = rfc2396Encode('https://123.56.183.160:8081/cas/callback')
+      const serviceUrl = rfc2396Encode('https://u757646-bba3-60bbb321.nmb1.seetacloud.com:8443/cas/callback')
       
-      console.log('编码前service:', 'https://123.56.183.160:8081/cas/callback')
+      console.log('编码前service:', 'https://u757646-bba3-60bbb321.nmb1.seetacloud.com:8443/cas/callback')
       console.log('编码后service:', serviceUrl)
       window.location.href = `${casLoginUrl}?service=${serviceUrl}`
     },
     // 添加多智能体系统跳转方法
     handleAgentLogin() {
       window.open('https://u2757646-bba3-60bbb321.nmb1.seetacloud.com:8443/', '_blank')
+    },
+    
+    /**
+     * 自动加入班级（扫码进班的核心逻辑）
+     * 作用：用户登录成功后，如果是扫码进班场景，自动调用加入班级接口
+     */
+    async autoJoinClass() {
+      try {
+        // 导入API函数
+        const { loginAccountAndAttend } = await import('@/api/classManage/teacher/index');
+        
+        // 调用加入班级接口
+        const response = await loginAccountAndAttend(this.classId);
+        
+        if (response.code === 1 || response.code === 200) {
+          // 加入成功
+          this.$message.success(response.msg || '加入班级成功');
+          console.log('成功加入班级:', this.classId);
+          
+          // 跳转到班级详情页（如果有的话）或首页
+          // 可以根据实际情况修改跳转目标
+          this.$router.push({ path: this.redirect || '/' });
+        } else {
+          // 加入失败
+          this.$message.error(response.msg || '加入班级失败');
+          console.error('加入班级失败:', response);
+          
+          // 即使加入失败，也跳转到首页（避免卡在登录页）
+          this.$router.push({ path: '/' });
+        }
+      } catch (error) {
+        console.error('加入班级出错:', error);
+        this.$message.error('加入班级失败：' + (error.message || '网络错误'));
+        
+        // 出错也跳转到首页
+        this.$router.push({ path: '/' });
+      }
+    },
+    
+    // 显示忘记密码对话框
+    showForgotPasswordDialog() {
+      this.forgotPasswordDialogVisible = true;
+      this.forgotPasswordStep = 0;
+      this.forgotPasswordForm = {
+        studentId: '',
+        nickName: '',
+        mobile: '',
+        newPassword: '',
+        confirmPassword: ''
+      };
+      this.userIdentityInfo = {};
+    },
+    
+    // 验证确认密码
+    validateConfirmPassword(rule, value, callback) {
+      if (value !== this.forgotPasswordForm.newPassword) {
+        callback(new Error('两次输入的密码不一致'));
+      } else {
+        callback();
+      }
+    },
+    
+    // 检查用户身份
+    async handleCheckIdentity() {
+      this.$refs.forgotPasswordForm.validate(async (valid) => {
+        if (valid) {
+          this.checkingIdentity = true;
+          try {
+            const response = await checkUserIdentity(this.forgotPasswordForm.studentId);
+            if (response.code === 1) {
+              this.userIdentityInfo = response.data;
+              if (!this.userIdentityInfo.hasMobile) {
+                this.$message.error('该用户未绑定手机号，无法通过此方式重置密码');
+                return;
+              }
+              this.forgotPasswordStep = 1;
+            } else {
+              this.$message.error(response.msg || '学号不存在');
+            }
+          } catch (error) {
+            this.$message.error('检查用户身份失败：' + (error.message || '网络错误'));
+          } finally {
+            this.checkingIdentity = false;
+          }
+        }
+      });
+    },
+    
+    // 验证身份信息
+    async handleVerifyIdentity() {
+      this.$refs.identityForm.validate(async (valid) => {
+        if (valid) {
+          // 前端只做基本格式验证，实际验证在后端
+          this.forgotPasswordStep = 2;
+        }
+      });
+    },
+    
+    // 重置密码
+    async handleResetPassword() {
+      this.$refs.resetPasswordForm.validate(async (valid) => {
+        if (valid) {
+          this.resettingPassword = true;
+          try {
+            const response = await resetPasswordByIdentity(
+              this.forgotPasswordForm.studentId,
+              this.forgotPasswordForm.nickName,
+              this.forgotPasswordForm.mobile,
+              this.forgotPasswordForm.newPassword
+            );
+            if (response.code === 1) {
+              this.$message.success('密码重置成功，请使用新密码登录');
+              this.forgotPasswordDialogVisible = false;
+              // 自动填充用户名和密码
+              this.loginForm.username = this.forgotPasswordForm.studentId;
+              this.loginForm.password = this.forgotPasswordForm.newPassword;
+            } else {
+              this.$message.error(response.msg || '密码重置失败');
+            }
+          } catch (error) {
+            this.$message.error('密码重置失败：' + (error.message || '网络错误'));
+          } finally {
+            this.resettingPassword = false;
+          }
+        }
+      });
     }
   }
 };
@@ -298,6 +586,19 @@ export default {
   text-align: right;
   margin-top: 15px;
   padding: 0;
+}
+
+/* 忘记密码链接容器 */
+.forgot-password-wrapper {
+  text-align: right;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  padding: 0;
+}
+
+.forgot-password-link {
+  font-size: 14px !important; /* 与 link-type 默认字体大小保持一致 */
+  text-decoration: none;
 }
 .overlay {
   position: absolute;

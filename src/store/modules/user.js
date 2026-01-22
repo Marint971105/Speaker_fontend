@@ -51,6 +51,8 @@ const user = {
           // console.log(code,msg,data)
           if (code === 1 && msg === 'success') {
             console.log('Login successful, token:', data);
+            // 先清除旧token，确保使用新token
+            removeToken();
             // 提取token
             const token = data;
             // 存储token到cookie
@@ -87,8 +89,25 @@ const user = {
     GetInfo({ commit, state }) {
       return new Promise((resolve, reject) => {
         getInfo().then(res => {
+          // 检查 res.data 是否存在
+          if (!res || !res.data) {
+            reject(new Error('获取用户信息失败：用户数据为空'))
+            return
+          }
+          
           const user = res.data
-          const avatar = (user.avatar == "" || user.avatar == null) ? require("@/assets/images/loginbackground.jpg") : process.env.VUE_APP_BASE_API + user.avatar;
+          
+          // 检查 user 对象是否有效
+          if (!user || typeof user !== 'object') {
+            reject(new Error('获取用户信息失败：用户数据格式错误'))
+            return
+          }
+          
+          // avatar 字段可能不存在（UserInfo 类没有 avatar 字段），使用默认头像
+          const avatar = (user.avatar == "" || user.avatar == null || user.avatar === undefined) 
+            ? require("@/assets/images/loginbackground.png") 
+            : process.env.VUE_APP_BASE_API + user.avatar;
+          
           // if (user.roleId && user.roleId.length > 0) { // 验证返回的roles是否是一个非空数组
           //   commit('SET_ROLES', user.roleId)
           //   commit('SET_PERMISSIONS', user.permissions)
@@ -122,6 +141,8 @@ const user = {
           method: 'post'
         }).then(response => {
           if (response.code === 1) {  // 注意这里是 code === 1
+            // 先清除旧token，确保使用新token
+            removeToken();
             const token = response.data  // 直接使用返回的 token
             setToken(token)
             commit('SET_TOKEN', token)

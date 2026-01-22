@@ -20,19 +20,23 @@
         </el-row>
         <el-row>
           <el-col :span="24">
-            <el-form-item label="作业描述:">
+            <el-form-item label="作业描述:" required>
               <el-input
                 type="textarea"
                 v-model="assignment.description"
-                placeholder="请输入作业描述"
-                :maxlength="50"
+                placeholder="请输入作业描述，需填写作业描述以区分相同名称的不同作业"
+                :maxlength="200"
               @input="handleInput"
               ></el-input>
-              <span v-if="descriptionLength > 50" style="color: red;">输入字数过多！</span> <!-- 提示信息 -->
+              <div style="margin-top: 5px;">
+                <span style="color: #909399; font-size: 12px;">需填写作业描述以区分相同名称的不同作业</span>
+                <span v-if="descriptionLength > 200" style="color: red; margin-left: 10px;">输入字数过多！</span>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row>
+        <!-- 作业附件功能已隐藏，暂时不使用 -->
+        <!-- <el-row>
           <el-col :span="12">
             <el-form-item label="作业附件:">
               <el-upload
@@ -47,14 +51,14 @@
               </el-upload>
             </el-form-item>
           </el-col>
-        </el-row>
+        </el-row> -->
         <el-row>
           <el-form-item label="提交内容:" required>
             <el-checkbox-group v-model="assignment.contentTypes">
-              <el-checkbox label="视频"></el-checkbox>
-              <el-checkbox label="音频" :disabled="true"></el-checkbox>
+              <el-checkbox label="视频" :disabled="isVideoDisabled"></el-checkbox>
+              <el-checkbox label="音频" :disabled="isAudioDisabled"></el-checkbox>
               <el-checkbox label="PPT"></el-checkbox>
-              <el-checkbox label="演讲稿" :disabled="true"></el-checkbox>
+              <el-checkbox label="演讲稿" :disabled="isScriptDisabled" class="script-checkbox">文稿</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
         </el-row>
@@ -95,7 +99,11 @@
           <el-col :span="24">
             <el-form-item label="分数设置:" required>
               <el-table :data="filteredScoreItems" style="width: 100%">
-                <el-table-column prop="category" label="类别" width="125" align="center" ></el-table-column>
+                <el-table-column label="类别" width="125" align="center">
+                  <template slot-scope="scope">
+                    {{ getDisplayName(scope.row.category) }}
+                  </template>
+                </el-table-column>
                 <el-table-column label="满分" width="120" align="center">100</el-table-column>
                 <el-table-column label="权重" width="125" align="center">
                   <template slot-scope="scope">
@@ -161,10 +169,10 @@ export default {
         description: '',
         name: '',
         deadline: '',
-        contentTypes: ['音频','演讲稿'],
+        contentTypes: [], // 默认全不勾选
         attachments: []
       },
-      maxDescriptionLength: 50, // 设置最大输入字数
+      maxDescriptionLength: 200, // 设置最大输入字数
       reviewProcesses: [],
       hiddenInformation:[],
       scoreItems: [
@@ -176,7 +184,14 @@ export default {
       totalScore: 100,
       weightSum: 100,
       fileList: [], // 存储选择的文件
-      taskJson: null  // 存储上传的数据
+      taskJson: null,  // 存储上传的数据
+      // 显示名称映射（只用于前端显示，不影响后端数据）
+      displayNameMap: {
+        '视频': '肢体语言',
+        '音频': '口语质量',
+        'PPT': 'PPT',
+        '演讲稿': '文稿'
+      }
     };
   },
   created() {
@@ -200,17 +215,48 @@ export default {
     },
     // 根据选择的提交内容类型过滤分数设置项
     filteredScoreItems() {
-      return this.scoreItems.filter(item => 
+      const filtered = this.scoreItems.filter(item => 
         this.assignment.contentTypes.includes(item.category)
       );
+      console.log('filteredScoreItems计算:', {
+        contentTypes: this.assignment.contentTypes,
+        scoreItems: this.scoreItems.map(item => item.category),
+        filtered: filtered.map(item => item.category)
+      });
+      return filtered;
     },
     // 计算当前选中项目的权重总和
     currentWeightSum() {
       return this.filteredScoreItems.reduce((sum, item) => sum + item.weight, 0);
+    },
+    // 判断是否选中视频
+    isVideoSelected() {
+      return this.assignment.contentTypes.includes('视频');
+    },
+    // 判断是否选中音频
+    isAudioSelected() {
+      return this.assignment.contentTypes.includes('音频');
+    },
+    // 视频是否禁用：如果选中音频，则禁用（因为音频需要视频，不能取消视频）
+    isVideoDisabled() {
+      return this.isAudioSelected; // 选中音频时禁用视频（因为音频需要视频）
+    },
+    // 音频是否禁用：音频可以单独勾选，不禁用
+    isAudioDisabled() {
+      return false; // 音频可以勾选
+    },
+    // 演讲稿是否禁用：如果选中音频，则禁用（因为会自动选中）；如果未选中音频，则可以选择
+    isScriptDisabled() {
+      return this.isAudioSelected; // 选中音频时禁用演讲稿（因为会自动选中）
     }
   },
 
   methods: {
+    // 获取显示名称（用于前端显示，数据层仍使用原名称）
+    getDisplayName(category) {
+      return this.displayNameMap[category] || category;
+    },
+    
     handleBeforeUpload(file) {
       // 将文件保存到 fileList 中，而不是立即上传
       this.fileList.push(file);
@@ -273,10 +319,7 @@ export default {
         reviewSettings: this.hiddenInformation,
         ownerName: this.name,  // 使用 Vuex getter 获取 ownerName
         ownerId: this.userId,  // 使用 Vuex getter 获取 ownerId
-        weights: this.filteredScoreItems.map(item => ({
-          category: item.category,
-          weight: item.weight
-        }))
+        weights: this.filteredScoreItems.map(item => item.weight)
       };
 
       // 构建 FormData 并将 JSON 和文件一起上传
@@ -424,19 +467,13 @@ export default {
       
       console.log('权重重新分配完成:', {
         selectedTypes: this.assignment.contentTypes,
-        weights: this.filteredScoreItems.map(item => ({
-          category: item.category,
-          weight: item.weight
-        })),
+        weights: this.filteredScoreItems.map(item => item.weight),
         totalWeight: this.currentWeightSum
       });
     },
     updateTaskJson() {
       // 更新 taskJson 数据，只包含选中的内容类型及其权重
-      const selectedWeights = this.filteredScoreItems.map(item => ({
-        category: item.category,
-        weight: item.weight
-      }));
+      const selectedWeights = this.filteredScoreItems.map(item => item.weight);
       
       this.taskJson = {
         submissionTypes: this.assignment.contentTypes,
@@ -467,8 +504,68 @@ export default {
           new: newContentTypes
         });
         
+        const hasVideo = newContentTypes.includes('视频');
+        const hasAudio = newContentTypes.includes('音频');
+        const hasScript = newContentTypes.includes('演讲稿');
+        const oldHasAudio = oldContentTypes && oldContentTypes.includes('音频');
+        let needRedistribute = false;
+        
+        // 如果音频被选中，确保视频也在列表中（防止用户通过其他方式取消视频）
+        if (hasAudio && !hasVideo) {
+          newContentTypes.push('视频');
+          this.$set(this.assignment, 'contentTypes', [...newContentTypes]);
+          needRedistribute = true;
+          return; // 提前返回，避免重复处理
+        }
+        
+        // 处理音频选择逻辑
+        if (hasAudio) {
+          // 选中音频时，自动添加视频和演讲稿（如果还没有）
+          let needUpdate = false;
+          if (!hasVideo) {
+            newContentTypes.push('视频');
+            needUpdate = true;
+          }
+          if (!hasScript) {
+            newContentTypes.push('演讲稿');
+            needUpdate = true;
+          }
+          if (needUpdate) {
+            // 使用 $set 确保响应式更新
+            this.$set(this.assignment, 'contentTypes', [...newContentTypes]);
+            needRedistribute = true;
+          } else {
+            // 即使没有添加新项，如果内容类型发生变化，也需要重新分配权重
+            needRedistribute = true;
+          }
+        } else if (oldHasAudio && !hasAudio) {
+          // 从选中音频变为取消音频时，移除视频和演讲稿（因为都是音频自动添加的）
+          // 让用户自行决定是否勾选视频
+          let needUpdate = false;
+          const videoIndex = newContentTypes.indexOf('视频');
+          const scriptIndex = newContentTypes.indexOf('演讲稿');
+          if (videoIndex > -1) {
+            newContentTypes.splice(videoIndex, 1);
+            needUpdate = true;
+          }
+          if (scriptIndex > -1) {
+            newContentTypes.splice(scriptIndex, 1);
+            needUpdate = true;
+          }
+          if (needUpdate) {
+            this.$set(this.assignment, 'contentTypes', [...newContentTypes]);
+            needRedistribute = true;
+          } else {
+            // 即使没有移除任何项，如果内容类型发生变化，也需要重新分配权重
+            needRedistribute = true;
+          }
+        } else {
+          // 其他情况（如直接选择视频、PPT等），也需要重新分配权重
+          needRedistribute = true;
+        }
+        
         // 如果选择的内容类型发生变化，重新分配权重
-        if (newContentTypes && newContentTypes.length > 0) {
+        if (needRedistribute && newContentTypes && newContentTypes.length > 0) {
           // 使用nextTick确保DOM更新后再重新分配权重
           this.$nextTick(() => {
             this.redistributeWeights();

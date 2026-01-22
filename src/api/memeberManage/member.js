@@ -1,6 +1,6 @@
 import request from '@/utils/request';
 
-export function getMembers({ page='', pageSize='', name = '', stuIndex = '', mail = '' }) {
+export function getMembers({ page='', pageSize='', name = '', stuIndex = '', mobile = '' }) {
   return request({
     url: '/getMembers',
     method: 'get',
@@ -9,7 +9,7 @@ export function getMembers({ page='', pageSize='', name = '', stuIndex = '', mai
       pageSize,
       name,
       stuIndex,
-      mail
+      mobile
     }
   });
 }
@@ -27,5 +27,17 @@ export function updateUserInfo(userId, data) {
     url: `/member/updateInfo?userId=${userId}`,
     method: 'POST',
    data
+  });
+}
+
+// 更新用户角色
+export function updateRole(userId, roleId) {
+  return request({
+    url: '/member/updateRole',
+    method: 'POST',
+    params: {
+      userId,
+      roleId
+    }
   });
 }

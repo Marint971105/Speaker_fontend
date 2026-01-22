@@ -21,7 +21,7 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- 题库系统 -->
-    <script src="ielts-question-bank.js"></script>
+    <script src="ielts-question-bank.js?v=2.0"></script>
     <!-- 高级分析引擎 -->
     <script src="advanced-analysis-engine.js"></script>
     
@@ -599,12 +599,12 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 IELTS Speaking Practice</h1>
+            <h1>🤖 口语智能练习</h1>
             <p>AI智能版 - 语音识别 + 智能评分</p>
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('record')">🎙️ 智能录音</button>
+            <button class="tab active" onclick="switchTab('record')">🎙️ 跟读训练</button>
             <button class="tab" onclick="switchTab('analysis')">📊 AI分析</button>
             <button class="tab" onclick="switchTab('history')">📚 历史记录</button>
         </div>
@@ -617,20 +617,20 @@
                         <div class="category-selector">
                             <label for="category">选择练习类别：</label>
                             <select id="category" onchange="app.onCategoryChange()">
-                                <option value="Part 1">Part 1 - 日常话题</option>
-                                <option value="Part 2">Part 2 - 话题描述</option>
-                                <option value="Part 3">Part 3 - 深度讨论</option>
-                                <option value="Practice">Practice - 自由练习</option>
+                                <option value="">请选择练习类别</option>
+                                <option value="Part1-TongueTwisters">Part 1 - 绕口令</option>
+                                <option value="Part2-BasicTraining">Part 2 - 基础训练</option>
+                                <option value="Part3-FreeReading">Part 3 - 自由朗读</option>
                             </select>
                         </div>
                         
                         <!-- 题目选择区域 -->
                         <div class="question-selector" style="margin: 20px 0;">
-                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                                <button class="btn btn-secondary" onclick="app.getRandomQuestion()" style="flex: 1;">
-                                    🎲 随机题目
+                            <div id="buttonContainer" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                <button class="btn btn-secondary" onclick="app.getRandomQuestion()" id="generateBtn" style="flex: 1;">
+                                    ✨ 自动生成题目
                                 </button>
-                                <button class="btn btn-secondary" onclick="app.showTopicSelector()" style="flex: 1;">
+                                <button class="btn btn-secondary" onclick="app.showTopicSelector()" id="topicBtn" style="flex: 1; display: none;">
                                     📚 选择话题
                                 </button>
                             </div>
@@ -664,16 +664,6 @@
                         </button>
 
                         <div class="timer" id="timer">00:00</div>
-
-                        <div class="speech-status">
-                            <div class="status-indicator" id="speechIndicator"></div>
-                            <span id="speechStatus">准备开始语音识别</span>
-                        </div>
-
-                        <div class="waveform" id="waveform">
-                            <canvas id="waveformCanvas" width="600" height="120"></canvas>
-                            <div id="waveformText" style="color: #999; text-align: center; padding: 20px;">🎵 实时音频波形显示</div>
-                        </div>
                     </div>
 
                     <div class="transcript-section">
@@ -694,15 +684,25 @@
                                 <div class="stat-label">WPM</div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div id="saveSection" class="save-section" style="display: none;">
-                    <h3 style="margin-bottom: 15px;">💾 保存录音</h3>
-                    <input type="text" id="recordingTitle" placeholder="输入录音标题（可选）">
-                    <div class="btn-group">
-                        <button class="btn btn-primary" onclick="saveRecording()">💾 保存并分析</button>
-                        <button class="btn btn-secondary" onclick="discardRecording()">🗑️ 丢弃录音</button>
+                        <div class="speech-status" style="margin-top: 20px;">
+                            <div class="status-indicator" id="speechIndicator"></div>
+                            <span id="speechStatus">准备开始语音识别</span>
+                        </div>
+
+                        <div class="waveform" id="waveform" style="margin-top: 20px;">
+                            <canvas id="waveformCanvas" width="600" height="120"></canvas>
+                            <div id="waveformText" style="color: #999; text-align: center; padding: 20px;">🎵 实时音频波形显示</div>
+                        </div>
+
+                        <div id="saveSection" class="save-section" style="display: none; margin-top: 20px;">
+                            <h3 style="margin-bottom: 15px;">💾 保存录音</h3>
+                            <input type="text" id="recordingTitle" placeholder="输入录音标题（可选）">
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="saveRecording()">💾 保存并分析</button>
+                                <button class="btn btn-secondary" onclick="discardRecording()">🗑️ 丢弃录音</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1833,19 +1833,67 @@
                 }
             }
 
-            // 类别变化时更新话题选择器
+            // 类别变化时的处理
             onCategoryChange() {
                 try {
                     const category = document.getElementById('category').value;
+                    
+                    // 隐藏当前题目
+                    this.hideCurrentQuestion();
+                    
+                    // 更新按钮显示
+                    this.updateButtonDisplay(category);
+                    
+                    if (!category) {
+                        this.hideTopicSelector();
+                        return;
+                    }
+                    
+                    // 根据类别类型处理
+                    switch(category) {
+                        case 'Part1-TongueTwisters':
+                            // 绕口令不需要话题选择器
+                            this.hideTopicSelector();
+                            break;
+                        case 'Part2-BasicTraining':
+                            // 基础训练使用现有题库，显示话题选择器
+                            this.updateTopicSelector('Part 2');
+                            break;
+                        case 'Part3-FreeReading':
+                            // 自由朗读不需要话题选择器
+                            this.hideTopicSelector();
+                            this.showFreeReadingPrompt();
+                            break;
+                    }
+                    
+                } catch (error) {
+                    console.error('更新类别选择器失败:', error);
+                }
+            }
+
+            // 更新话题选择器
+            updateTopicSelector(category) {
+                try {
                     const topicSelect = document.getElementById('topicSelect');
+                    const topicSelector = document.getElementById('topicSelector');
                     
                     if (!topicSelect || !this.questionBank) return;
                     
                     // 清空话题选择器
                     topicSelect.innerHTML = '<option value="">请选择话题</option>';
                     
-                    // 获取当前类别的话题
+                    // 获取当前类别的话题（对于Part 2，返回的是大类）
                     const topics = this.questionBank.getTopicsByCategory(category);
+                    
+                    console.log('=== 调试信息 ===');
+                    console.log('类别:', category);
+                    console.log('获取到的话题列表:', topics);
+                    console.log('话题数量:', topics.length);
+                    console.log('话题类型检查:', typeof topics[0]);
+                    if (category === 'Part 2') {
+                        console.log('Part 2 分类映射:', this.questionBank.getPart2TopicCategories());
+                    }
+                    console.log('===============');
                     
                     topics.forEach(topic => {
                         const option = document.createElement('option');
@@ -1854,19 +1902,82 @@
                         topicSelect.appendChild(option);
                     });
                     
-                    // 隐藏当前题目
-                    this.hideCurrentQuestion();
+                    // 显示话题选择器
+                    if (topicSelector) {
+                        topicSelector.style.display = 'block';
+                    }
                     
                 } catch (error) {
                     console.error('更新话题选择器失败:', error);
                 }
             }
 
-            // 获取随机题目
+            // 隐藏话题选择器
+            hideTopicSelector() {
+                try {
+                    const topicSelector = document.getElementById('topicSelector');
+                    if (topicSelector) {
+                        topicSelector.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('隐藏话题选择器失败:', error);
+                }
+            }
+
+            // 更新按钮显示
+            updateButtonDisplay(category) {
+                try {
+                    const generateBtn = document.getElementById('generateBtn');
+                    const topicBtn = document.getElementById('topicBtn');
+                    
+                    if (!generateBtn || !topicBtn) return;
+                    
+                    if (category === 'Part2-BasicTraining') {
+                        // Part 2 时显示两个按钮
+                        generateBtn.style.display = 'block';
+                        generateBtn.style.flex = '1';
+                        topicBtn.style.display = 'block';
+                    } else if (category === 'Part1-TongueTwisters') {
+                        // Part 1 时只显示自动生成题目按钮
+                        generateBtn.style.display = 'block';
+                        generateBtn.style.flex = '1';
+                        topicBtn.style.display = 'none';
+                    } else {
+                        // Part 3 或其他情况不显示任何按钮
+                        generateBtn.style.display = 'none';
+                        topicBtn.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('更新按钮显示失败:', error);
+                }
+            }
+
+            // 生成题目
             getRandomQuestion() {
                 try {
                     const category = document.getElementById('category').value;
-                    const question = this.questionBank.getRandomQuestion(category);
+                    
+                    if (!category) {
+                        alert('请先选择练习类别');
+                        return;
+                    }
+                    
+                    let question;
+                    
+                    switch(category) {
+                        case 'Part1-TongueTwisters':
+                            question = this.generateTongueTwister();
+                            break;
+                        case 'Part2-BasicTraining':
+                            question = this.questionBank.getRandomQuestion('Part 2');
+                            break;
+                        case 'Part3-FreeReading':
+                            question = this.generateFreeReadingPrompt();
+                            break;
+                        default:
+                            alert('未知的练习类别');
+                            return;
+                    }
                     
                     if (question) {
                         this.currentQuestion = question;
@@ -1875,8 +1986,8 @@
                         alert('该类别暂无题目');
                     }
                 } catch (error) {
-                    console.error('获取随机题目失败:', error);
-                    alert('获取题目失败');
+                    console.error('生成题目失败:', error);
+                    alert('生成题目失败');
                 }
             }
 
@@ -1903,13 +2014,16 @@
                         return;
                     }
                     
-                    const question = this.questionBank.getQuestionByTopic(category, topic);
-                    
-                    if (question) {
-                        this.currentQuestion = question;
-                        this.displayQuestion(question);
-                    } else {
-                        alert('该话题暂无题目');
+                    // 只有Part2-BasicTraining支持话题选择
+                    if (category === 'Part2-BasicTraining') {
+                        const question = this.questionBank.getQuestionByTopic('Part 2', topic);
+                        
+                        if (question) {
+                            this.currentQuestion = question;
+                            this.displayQuestion(question);
+                        } else {
+                            alert('该话题暂无题目');
+                        }
                     }
                 } catch (error) {
                     console.error('获取话题题目失败:', error);
@@ -1929,15 +2043,19 @@
                     // 显示题目内容
                     questionDisplay.innerHTML = `
                         <div class="question-title">
-                            ${this.getCategoryIcon(question.category)} ${question.topic || question.category}
+                            ${this.getCategoryIcon(question.category)} ${question.topic || question.category || '练习题目'}
                         </div>
                         <div class="question-content">
-                            ${question.question}
+                            ${question.question || ''}
                         </div>
                     `;
                     
-                    // 显示答题技巧
-                    if (question.tips && question.tips.length > 0 && questionTips && tipsList) {
+                    // 显示答题技巧（Part 3 自由朗读不显示答题技巧）
+                    if (question.category === 'FreeReading') {
+                        if (questionTips) {
+                            questionTips.style.display = 'none';
+                        }
+                    } else if (question.tips && question.tips.length > 0 && questionTips && tipsList) {
                         tipsList.innerHTML = '';
                         question.tips.forEach(tip => {
                             const li = document.createElement('li');
@@ -1964,7 +2082,7 @@
                         questionDisplay.innerHTML = `
                             <div style="text-align: center; color: #666; padding: 20px;">
                                 <div style="font-size: 2em; margin-bottom: 10px;">🎯</div>
-                                <p>点击"随机题目"开始练习，或选择特定话题</p>
+                                <p>选择练习类别开始练习</p>
                             </div>
                         `;
                     }
@@ -1985,9 +2103,122 @@
                     'Part 1': '🗣️',
                     'Part 2': '📝',
                     'Part 3': '💭',
-                    'Practice': '🎯'
+                    'Practice': '🎯',
+                    'TongueTwister': '👅',
+                    'BasicTraining': '📚',
+                    'FreeReading': '📖'
                 };
                 return icons[category] || '📚';
+            }
+
+            // === 新增功能方法 ===
+
+            // 生成绕口令
+            generateTongueTwister() {
+                const tongueTwisters = [
+                    {
+                        text: "She sells seashells by the seashore. The shells she sells are surely seashells.",
+                        difficulty: "初级",
+                        focus: "S音练习"
+                    },
+                    {
+                        text: "Peter Piper picked a peck of pickled peppers. A peck of pickled peppers Peter Piper picked.",
+                        difficulty: "初级",
+                        focus: "P音练习"
+                    },
+                    {
+                        text: "How much wood would a woodchuck chuck if a woodchuck could chuck wood?",
+                        difficulty: "中级",
+                        focus: "W音和CH音练习"
+                    },
+                    {
+                        text: "Red lorry, yellow lorry, red lorry, yellow lorry.",
+                        difficulty: "中级",
+                        focus: "L和R音区分"
+                    },
+                    {
+                        text: "The thirty-three thieves thought that they thrilled the throne throughout Thursday.",
+                        difficulty: "高级",
+                        focus: "TH音练习"
+                    },
+                    {
+                        text: "Six sick slick slim sycamore saplings.",
+                        difficulty: "高级",
+                        focus: "S音连读练习"
+                    },
+                    {
+                        text: "Betty Botter bought some butter, but she said the butter's bitter.",
+                        difficulty: "中级",
+                        focus: "B音和T音练习"
+                    },
+                    {
+                        text: "Fuzzy Wuzzy was a bear. Fuzzy Wuzzy had no hair. Fuzzy Wuzzy wasn't fuzzy, was he?",
+                        difficulty: "初级",
+                        focus: "Z音和W音练习"
+                    }
+                ];
+
+                const randomTwister = tongueTwisters[Math.floor(Math.random() * tongueTwisters.length)];
+                
+                return {
+                    category: 'TongueTwister',
+                    topic: `绕口令练习 - ${randomTwister.difficulty}`,
+                    question: `
+                        <div class="tongue-twister-content">
+                            <div class="twister-text" style="font-size: 1.2em; line-height: 1.6; margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                "${randomTwister.text}"
+                            </div>
+                            <div class="twister-info" style="display: flex; gap: 20px; margin-bottom: 15px;">
+                                <span style="color: #4facfe;"><strong>难度:</strong> ${randomTwister.difficulty}</span>
+                                <span style="color: #00c851;"><strong>练习重点:</strong> ${randomTwister.focus}</span>
+                            </div>
+                            <div class="practice-instructions" style="color: #666; font-size: 0.9em;">
+                                <p><strong>练习建议:</strong></p>
+                                <ul style="margin-left: 20px;">
+                                    <li>先慢速朗读，确保发音准确</li>
+                                    <li>逐渐加快速度，保持清晰度</li>
+                                    <li>重复练习3-5遍</li>
+                                    <li>注意重点音素的发音</li>
+                                </ul>
+                            </div>
+                        </div>
+                    `,
+                    tips: [
+                        "先理解句子含义，再开始练习",
+                        "重点关注容易混淆的音素",
+                        "保持口型准确，不要急于求快",
+                        "可以录音回放检查发音效果"
+                    ]
+                };
+            }
+
+            // 生成自由朗读提示
+            generateFreeReadingPrompt() {
+                return {
+                    category: 'FreeReading',
+                    topic: '自由朗读练习',
+                    question: `
+                        <div class="free-reading-content">
+                            <div class="reading-prompt" style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+                                <div style="font-size: 2em; margin-bottom: 15px;">📖</div>
+                                <h3 style="margin-bottom: 15px;">自由朗读时间</h3>
+                                <p style="font-size: 1.1em; opacity: 0.9;">选择任何您想要练习的英文内容进行朗读</p>
+                            </div>
+                        </div>
+                    `,
+                    tips: []
+                };
+            }
+
+            // 显示自由朗读提示
+            showFreeReadingPrompt() {
+                try {
+                    const question = this.generateFreeReadingPrompt();
+                    this.currentQuestion = question;
+                    this.displayQuestion(question);
+                } catch (error) {
+                    console.error('显示自由朗读提示失败:', error);
+                }
             }
 
             // 初始化音频可视化

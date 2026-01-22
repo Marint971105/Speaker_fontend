@@ -45,3 +45,28 @@ export function getApplicationsByClassId(params) {
     params
   })
 }
+
+// 获取学生已加入的班级列表
+export function getMyClasses(params) {
+  return request({
+    url: '/class/stuBelongs',
+    method: 'get',
+    params: {
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      studentId: params.studentId
+    }
+  });
+}
+
+// 学生主动退出班级
+export function leaveClass(params) {
+  return request({
+    url: '/class/leaveClass',
+    method: 'post',
+    params: {
+      classId: params.classId,
+      studentId: params.studentId
+    }
+  });
+}
